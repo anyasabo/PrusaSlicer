@@ -2964,6 +2964,8 @@ void TabPrinter::build_fff()
 
         optgroup = page->new_optgroup(L("Skew Correction"));
         optgroup->append_single_option_line("skew_xy_correction");
+        optgroup->append_single_option_line("skew_xz_correction");
+        optgroup->append_single_option_line("skew_yz_correction");
 
         optgroup = page->new_optgroup(L("Capabilities"));
         ConfigOptionDef def;

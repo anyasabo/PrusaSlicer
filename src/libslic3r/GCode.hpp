@@ -133,14 +133,41 @@ public:
         if constexpr (Derived::SizeAtCompileTime == 2) {
             Vec2d p = Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
                 - m_config.extruder_offset.get_at(m_writer.extruder()->id());
-            // Apply XY skew correction: x' = x + (y - y_ref) * tan(skew_angle)
-            if (m_skew_xy_k != 0.0)
-                p.x() += (p.y() - m_skew_y_ref) * m_skew_xy_k;
+            // 2D points carry no Z of their own, so the shear uses the Z of the layer being
+            // generated. Within a layer that is exact; under spiral vase it quantizes the Z
+            // shear to the layer, an error of one layer height times the factor.
+            this->apply_skew(p, m_last_layer_z);
             return p;
         } else {
-            const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
-            return to_3d(gcode_point_xy, unscaled(point.z()));
+            const coordf_t z = unscaled(point.z());
+            Vec2d p = Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
+                - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+            this->apply_skew(p, z);
+            return to_3d(p, z);
         }
+    }
+
+    // Apply skew correction to a point already in G-code coordinates.
+    //
+    // This mirrors Marlin's Planner::skew() so that the emitted G-code lands where M852 would
+    // have put it on firmware that implements skew correction:
+    //     x' = x + (y - y_ref)*k_xy + z*(k_xz + k_xy*k_yz)
+    //     y' = y + z*k_yz
+    // Marlin writes the same transform with subtraction, hence the inverted factor sign
+    // documented on the skew_*_correction options. The k_xy*k_yz cross term is Marlin's, and
+    // matters only in that it keeps the two implementations bit-comparable.
+    //
+    // The transform is affine, so a straight extrusion stays straight and only endpoints need
+    // correcting. Circles do not survive the XY shear, which is why arc fitting is disabled
+    // when skew_xy_correction is set; the XZ/YZ shears are a constant translation within a
+    // layer, so they leave arcs intact.
+    void apply_skew(Vec2d &p, double z) const {
+        if (m_skew_xy_k == 0.0 && m_skew_xz_k == 0.0 && m_skew_yz_k == 0.0)
+            return;
+        // Both rows are defined in terms of the incoming Y, so read it before writing.
+        const double dy = p.y() - m_skew_y_ref;
+        p.x() += dy * m_skew_xy_k + z * (m_skew_xz_k + m_skew_xy_k * m_skew_yz_k);
+        p.y() += z * m_skew_yz_k;
     }
 
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
@@ -379,8 +406,11 @@ private:
     FullPrintConfig                     m_config;
     // scaled G-code resolution
     double                              m_scaled_resolution;
-    // XY skew correction: tan(skew_angle) and Y reference for shearing
+    // Skew correction: tan(skew_angle) per axis pair, and the Y reference for the XY shear.
+    // The XZ/YZ shears are referenced to the bed (Z=0), where physical skew accumulates from.
     double                              m_skew_xy_k{0.0};
+    double                              m_skew_xz_k{0.0};
+    double                              m_skew_yz_k{0.0};
     double                              m_skew_y_ref{0.0};
     GCodeWriter                         m_writer;
 

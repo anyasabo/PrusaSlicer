@@ -1057,6 +1057,8 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,               wiping_volumes_use_custom_matrix))
     ((ConfigOptionFloat,              z_offset))
     ((ConfigOptionFloat,              skew_xy_correction))
+    ((ConfigOptionFloat,              skew_xz_correction))
+    ((ConfigOptionFloat,              skew_yz_correction))
 )
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(

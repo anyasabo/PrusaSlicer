@@ -906,8 +906,10 @@ static inline bool arc_welder_enabled(const PrintConfig& print_config)
         print_config.arc_fitting != ArcFittingType::Disabled &&
         // Not a spiral vase print
         !print_config.spiral_vase &&
-        // Skew correction active — arcs would be emitted as single chords
-        // (losing all intermediate curve points), causing visible faceting.
+        // XY skew correction active — the shear turns circles into ellipses, and arcs would be
+        // emitted as single chords (losing all intermediate curve points), causing visible
+        // faceting. XZ/YZ skew is deliberately not checked here: within a layer it is a constant
+        // translation of the whole toolpath, which leaves arcs and their I/J offsets valid.
         print_config.skew_xy_correction.value == 0.0 &&
         // Presure equalizer not used
         print_config.max_volumetric_extrusion_rate_slope_negative == 0. &&
@@ -2963,19 +2965,33 @@ void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
     m_config.apply(print_config);
     m_scaled_resolution = scaled<double>(print_config.gcode_resolution.value);
 
-    // Initialize XY skew correction
+    // Initialize skew correction
     {
-        double skew_deg = m_config.skew_xy_correction.value;
-        if (skew_deg != 0.0 && !m_config.bed_shape.values.empty()) {
-            m_skew_xy_k = std::tan(skew_deg * M_PI / 180.0);
-            // Reference Y = center of bed
+        const double skew_xy_deg = m_config.skew_xy_correction.value;
+        const double skew_xz_deg = m_config.skew_xz_correction.value;
+        const double skew_yz_deg = m_config.skew_yz_correction.value;
+        const bool   any_skew    = skew_xy_deg != 0.0 || skew_xz_deg != 0.0 || skew_yz_deg != 0.0;
+        // The XY shear needs a Y reference; without a bed we have nothing to center it on.
+        // The XZ/YZ shears are referenced to the bed plane (Z=0) and need no such fallback.
+        if (any_skew && !m_config.bed_shape.values.empty()) {
+            m_skew_xy_k = std::tan(skew_xy_deg * M_PI / 180.0);
+            m_skew_xz_k = std::tan(skew_xz_deg * M_PI / 180.0);
+            m_skew_yz_k = std::tan(skew_yz_deg * M_PI / 180.0);
+            // Reference Y = center of bed. This only translates the result; it keeps the X
+            // displacement symmetric about the bed rather than growing across it.
             BoundingBoxf bed_bb(m_config.bed_shape.values);
             m_skew_y_ref = (bed_bb.min.y() + bed_bb.max.y()) / 2.0;
-            BOOST_LOG_TRIVIAL(info) << "XY skew correction: angle=" << skew_deg
-                                    << "° k=" << m_skew_xy_k
+            BOOST_LOG_TRIVIAL(info) << "Skew correction: xy=" << skew_xy_deg
+                                    << "° xz=" << skew_xz_deg
+                                    << "° yz=" << skew_yz_deg
+                                    << "° k_xy=" << m_skew_xy_k
+                                    << " k_xz=" << m_skew_xz_k
+                                    << " k_yz=" << m_skew_yz_k
                                     << " y_ref=" << m_skew_y_ref;
         } else {
             m_skew_xy_k = 0.0;
+            m_skew_xz_k = 0.0;
+            m_skew_yz_k = 0.0;
             m_skew_y_ref = 0.0;
         }
     }
@@ -4073,11 +4089,15 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
 Point GCodeGenerator::gcode_to_point(const Vec2d &point) const
 {
     Vec2d pt = point - m_origin;
-    // Reverse XY skew correction (inverse of point_to_gcode shear).
-    // The forward transform only modifies X: x' = x + (y - y_ref) * k,
-    // so Y is unchanged and the inverse is: x = x' - (y - y_ref) * k.
-    if (m_skew_xy_k != 0.0)
-        pt.x() -= (pt.y() - m_skew_y_ref) * m_skew_xy_k;
+    // Reverse the skew correction applied by point_to_gcode/apply_skew. The forward transform is
+    //     x' = x + (y - y_ref)*k_xy + z*(k_xz + k_xy*k_yz)
+    //     y' = y + z*k_yz
+    // so Y must be un-sheared first, because the X row is expressed in terms of the original Y.
+    if (m_skew_xy_k != 0.0 || m_skew_xz_k != 0.0 || m_skew_yz_k != 0.0) {
+        const double z = m_last_layer_z;
+        pt.y() -= z * m_skew_yz_k;
+        pt.x() -= (pt.y() - m_skew_y_ref) * m_skew_xy_k + z * (m_skew_xz_k + m_skew_xy_k * m_skew_yz_k);
+    }
     if (const Extruder *extruder = m_writer.extruder(); extruder)
         // This function may be called at the very start from toolchange G-code when the extruder is not assigned yet.
         pt += m_config.extruder_offset.get_at(extruder->id());

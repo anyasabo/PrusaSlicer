@@ -3990,7 +3990,41 @@ void PrintConfigDef::init_fff_params()
                    "in degrees. Positive values shear X in the +X direction as Y increases. "
                    "Use the Dimensional Accuracy calibration tool to measure skew, then "
                    "compute the angle from the diagonal measurements of a printed square. "
-                   "Arc fitting (G2/G3) is automatically disabled when skew correction is active.");
+                   "This is the equivalent of Marlin's M852 I factor, but expressed as an "
+                   "angle and with the opposite sign: enter -atan(XY_SKEW_FACTOR) in degrees. "
+                   "Arc fitting (G2/G3) is automatically disabled when XY skew correction is active.");
+    def->sidetext = L("°");
+    def->min = -5;
+    def->max = 5;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("skew_xz_correction", coFloat);
+    def->label = L("XZ Skew Correction");
+    def->category = L("Advanced");
+    def->tooltip = L("Corrects XZ axis non-orthogonality (skew) by shearing X as a function "
+                   "of layer height. Enter the measured skew angle in degrees. Positive values "
+                   "shear X in the +X direction as Z increases. The shear is referenced to the "
+                   "bed (Z=0), so the first layer is left exactly where it was sliced and the "
+                   "correction accumulates with height. "
+                   "This is the equivalent of Marlin's M852 J factor, but expressed as an "
+                   "angle and with the opposite sign: enter -atan(XZ_SKEW_FACTOR) in degrees.");
+    def->sidetext = L("°");
+    def->min = -5;
+    def->max = 5;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("skew_yz_correction", coFloat);
+    def->label = L("YZ Skew Correction");
+    def->category = L("Advanced");
+    def->tooltip = L("Corrects YZ axis non-orthogonality (skew) by shearing Y as a function "
+                   "of layer height. Enter the measured skew angle in degrees. Positive values "
+                   "shear Y in the +Y direction as Z increases. The shear is referenced to the "
+                   "bed (Z=0), so the first layer is left exactly where it was sliced and the "
+                   "correction accumulates with height. "
+                   "This is the equivalent of Marlin's M852 K factor, but expressed as an "
+                   "angle and with the opposite sign: enter -atan(YZ_SKEW_FACTOR) in degrees.");
     def->sidetext = L("°");
     def->min = -5;
     def->max = 5;

@@ -1819,3 +1819,31 @@ if(SLIC3R_BUILD_TESTS)
         prusaslicer_copy_dlls(slic3r-shared-tests)
     endif ()
 endif()
+
+# The facets_deserialize target is in this module because it uses the 3MF paint data validator.
+slic3r_add_fuzzer(facets_deserialize
+    SOURCES fuzz/FacetsDeserializeFuzzer.cpp
+    LIBS    slic3r-shared
+    CORPUS  fuzz/corpus/facets_deserialize
+)
+
+slic3r_add_fuzzer(load_3mf
+    SOURCES fuzz/Load3mfFuzzer.cpp
+    LIBS    slic3r-shared miniz
+    CORPUS  fuzz/corpus/load_3mf
+    DICT    fuzz/load_3mf.dict
+)
+
+slic3r_add_fuzzer(obj
+    SOURCES fuzz/ObjFuzzer.cpp
+    LIBS    slic3r-shared
+    CORPUS  fuzz/corpus/obj
+    DICT    fuzz/obj.dict
+)
+
+slic3r_add_fuzzer(stl
+    SOURCES fuzz/StlFuzzer.cpp
+    LIBS    slic3r-shared
+    CORPUS  fuzz/corpus/stl
+    DICT    fuzz/stl.dict
+)

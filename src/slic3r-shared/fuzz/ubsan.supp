@@ -1,0 +1,19 @@
+# UBSan suppressions for the fuzz harnesses (UBSAN_OPTIONS=suppressions=<this file>).
+# miniz reads unaligned 32-bit words on purpose; harmless on x86/arm64.
+alignment:miniz.c
+# Legacy config: ConfigBase::option<ConfigOptionEnum<T>>() checks only coEnum, then static_casts to a
+# specific enum class. UB but layout-identical; fires on every legacy 3MF (even upstream test files).
+vptr:*/Config/Legacy/*
+vptr:*/Config/ConfigLegacy.cpp
+# SLIC3R_UBSAN adds Clang's -fsanitize=integer. Its checks report well-defined unsigned wrap-around
+# and implicit conversions (libstdc++, Eigen, fast_float) on each input. The SLIC3R_FUZZ build
+# turns them off at compile time (cmake/modules/Fuzzing.cmake). These lines do the same for the
+# corpus replay, so that only undefined behavior stops it.
+unsigned-integer-overflow:*
+implicit-unsigned-integer-truncation:*
+implicit-signed-integer-truncation:*
+implicit-integer-sign-change:*
+# The runtime has no suppression type for unsigned-shift-base. It reports those as shift-base.
+# Suppress them only in the standard library headers (vector<bool> in libc++), so that the
+# undefined signed shifts in PrusaSlicer code still stop the replay.
+shift-base:*/c++/*

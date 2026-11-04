@@ -1,0 +1,86 @@
+--- [Content_Types].xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+ <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+ <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+ <Default Extension="png" ContentType="image/png"/>
+</Types>
+--- _rels/.rels
+<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+ <Relationship Target="/Metadata/thumbnail.png" Id="rel-2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"/>
+</Relationships>
+--- 3D/3dmodel.model
+<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06">
+ <metadata name="slic3rpe:Version3mf">1</metadata>
+ <metadata name="Title">sla_roundtrip1</metadata>
+ <metadata name="Designer"></metadata>
+ <metadata name="Description">sla_roundtrip1</metadata>
+ <metadata name="Copyright"></metadata>
+ <metadata name="LicenseTerms"></metadata>
+ <metadata name="Rating"></metadata>
+ <metadata name="CreationDate">2025-06-10</metadata>
+ <metadata name="ModificationDate">2025-06-10</metadata>
+ <metadata name="Application">PrusaSlicer-2.9.2</metadata>
+ <resources>
+  <object id="1" type="model">
+   <mesh>
+    <vertices>
+     <vertex x="6.3499999" y="6.3499999" z="-6.3499999"/>
+     <vertex x="6.3499999" y="-6.3499999" z="-6.3499999"/>
+     <vertex x="-6.3499999" y="-6.3499999" z="-6.3499999"/>
+     <vertex x="-6.3499999" y="6.3499999" z="-6.3499999"/>
+     <vertex x="6.3499999" y="6.3499999" z="6.3499999"/>
+     <vertex x="-6.3499999" y="6.3499999" z="6.3499999"/>
+     <vertex x="-6.3499999" y="-6.3499999" z="6.3499999"/>
+     <vertex x="6.3499999" y="-6.3499999" z="6.3499999"/>
+     <vertex x="15.2146711" y="-0.544605017" z="-6.3499999"/>
+     <vertex x="15.2146711" y="-13.2446041" z="-6.3499999"/>
+     <vertex x="2.51467109" y="-13.2446041" z="-6.3499999"/>
+     <vertex x="2.51467109" y="-0.544605017" z="-6.3499999"/>
+     <vertex x="15.2146711" y="-0.544605017" z="6.3499999"/>
+     <vertex x="2.51467109" y="-0.544605017" z="6.3499999"/>
+     <vertex x="2.51467109" y="-13.2446041" z="6.3499999"/>
+     <vertex x="15.2146711" y="-13.2446041" z="6.3499999"/>
+    </vertices>
+    <triangles>
+     <triangle v1="0" v2="1" v3="2"/>
+     <triangle v1="0" v2="2" v3="3"/>
+     <triangle v1="4" v2="5" v3="6"/>
+     <triangle v1="4" v2="6" v3="7"/>
+     <triangle v1="0" v2="4" v3="7"/>
+     <triangle v1="0" v2="7" v3="1"/>
+     <triangle v1="1" v2="7" v3="6"/>
+     <triangle v1="1" v2="6" v3="2"/>
+     <triangle v1="2" v2="6" v3="5"/>
+     <triangle v1="2" v2="5" v3="3"/>
+     <triangle v1="4" v2="0" v3="3"/>
+     <triangle v1="4" v2="3" v3="5"/>
+     <triangle v1="8" v2="9" v3="10"/>
+     <triangle v1="8" v2="10" v3="11"/>
+     <triangle v1="12" v2="13" v3="14"/>
+     <triangle v1="12" v2="14" v3="15"/>
+     <triangle v1="8" v2="12" v3="15"/>
+     <triangle v1="8" v2="15" v3="9"/>
+     <triangle v1="9" v2="15" v3="14"/>
+     <triangle v1="9" v2="14" v3="10"/>
+     <triangle v1="10" v2="14" v3="13"/>
+     <triangle v1="10" v2="13" v3="11"/>
+     <triangle v1="12" v2="8" v3="11"/>
+     <triangle v1="12" v2="11" v3="13"/>
+    </triangles>
+   </mesh>
+  </object>
+ </resources>
+ <build>
+  <item objectid="1" transform="1 0 0 0 1 0 0 0 1 64 40.5 6.3499999" printable="1"/>
+ </build>
+</model>
+--- Metadata/Slic3r_PE_sla_drain_holes.txt
+drain_holes_format_version=1
+object_id=1|-7.35 -2.63 -2.30 1.0 0.0 0.0 2.0
+--- Metadata/Slic3r_PE_sla_support_points.txt
+support_points_format_version=1
+object_id=1|1.0 2.0 6.35 0.4 1.0 7.0

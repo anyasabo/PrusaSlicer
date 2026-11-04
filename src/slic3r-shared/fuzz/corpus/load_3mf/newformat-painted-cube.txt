@@ -1,0 +1,46 @@
+--- [Content_Types].xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>
+--- _rels/.rels
+<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>
+--- 3D/3dmodel.model
+<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <metadata name="Application">PrusaSlicer-3.0.0-alpha13</metadata>
+ <resources>
+  <object id="1" type="model">
+   <mesh>
+    <vertices>
+     <vertex x="0" y="0" z="0"/>
+     <vertex x="10" y="0" z="0"/>
+     <vertex x="10" y="10" z="0"/>
+     <vertex x="0" y="10" z="0"/>
+     <vertex x="0" y="0" z="10"/>
+     <vertex x="10" y="0" z="10"/>
+     <vertex x="10" y="10" z="10"/>
+     <vertex x="0" y="10" z="10"/>
+    </vertices>
+    <triangles>
+     <triangle v1="0" v2="2" v3="1"/>
+     <triangle v1="0" v2="3" v3="2"/>
+     <triangle v1="4" v2="5" v3="6"/>
+     <triangle v1="4" v2="6" v3="7"/>
+     <triangle v1="0" v2="1" v3="5"/>
+     <triangle v1="0" v2="5" v3="4"/>
+     <triangle v1="1" v2="2" v3="6"/>
+     <triangle v1="1" v2="6" v3="5"/>
+     <triangle v1="2" v2="3" v3="7"/>
+     <triangle v1="2" v2="7" v3="6"/>
+     <triangle v1="3" v2="0" v3="4"/>
+     <triangle v1="3" v2="4" v3="7"/>
+    </triangles>
+   </mesh>
+  </object>
+ </resources>
+ <build>
+  <item objectid="1"/>
+ </build>
+</model>
+--- Metadata/Slic3r_facets_annotation.json
+[{"id": 1, "mmSegmentationFacets": [{"triangle": 0, "dividing": "4"}], "mmSegmentationFacetsVersion": 1}]

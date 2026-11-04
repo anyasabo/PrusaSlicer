@@ -290,6 +290,7 @@ enable_testing()
 include(DoxygenTarget)
 include(LuaDocsTarget)
 include(Sanitizers)
+include(Fuzzing)
 
 if (NOT SLIC3R_ASAN AND NOT SLIC3R_UBSAN)
     include(CheckIPOSupported)

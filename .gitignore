@@ -32,3 +32,6 @@ CMakeUserPresets.json
 
 # Copied from the deps install prefix at configure time
 /resources/matdb/
+
+# Fuzz reproducers of unreported bugs stay local (see doc/Fuzzing.md)
+**/fuzz/crashers/

@@ -166,3 +166,9 @@ if(SLIC3R_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 endif()
+
+slic3r_add_fuzzer(facets_deserialize
+    SOURCES fuzz/FacetsDeserializeFuzzer.cpp
+    LIBS    slic3r-biz-algorithms TBB::tbb
+    CORPUS  fuzz/corpus/facets_deserialize
+)

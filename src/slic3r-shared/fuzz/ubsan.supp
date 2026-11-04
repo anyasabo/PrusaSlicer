@@ -1,0 +1,7 @@
+# UBSan suppressions for the fuzz harnesses (UBSAN_OPTIONS=suppressions=<this file>).
+# miniz reads unaligned 32-bit words on purpose; harmless on x86/arm64.
+alignment:miniz.c
+# Legacy config: ConfigBase::option<ConfigOptionEnum<T>>() checks only coEnum, then static_casts to a
+# specific enum class. UB but layout-identical; fires on every legacy 3MF (even upstream test files).
+vptr:*/Config/Legacy/*
+vptr:*/Config/ConfigLegacy.cpp

@@ -2,10 +2,11 @@ get_filename_component(_TEST_NAME ${CMAKE_CURRENT_LIST_DIR} NAME)
 add_executable(${_TEST_NAME}_tests ${_TEST_NAME}_tests_main.cpp
     test_arrange.cpp
     test_arrange_integration.cpp
+    test_seq_arrange_project.cpp
     ../data/prusaparts.cpp
 )
 
-target_link_libraries(${_TEST_NAME}_tests test_common slic3r-arrange-wrapper)
+target_link_libraries(${_TEST_NAME}_tests test_common slic3r-arrange-wrapper libslic3r)
 set_property(TARGET ${_TEST_NAME}_tests PROPERTY FOLDER "tests")
 
 if (WIN32)

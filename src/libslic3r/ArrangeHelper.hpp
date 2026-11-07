@@ -14,8 +14,15 @@ namespace Slic3r {
 	class ExceptionCannotApplySeqArrange : public std::exception {};
 
 	void arrange_model_sequential(Model& model, const ConfigBase& config);
-    
+
 	std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Model& model, const ConfigBase& config);
+
+	// Building blocks of SeqArrange, exposed for tests and benchmarks so they
+	// can run the scheduler with a modified SolverConfiguration and inspect
+	// the resulting plates without going through a Model roundtrip.
+	Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config);
+	Sequential::SolverConfiguration get_solver_config(const Sequential::PrinterGeometry& printer_geometry);
+	std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Model& model, const Sequential::PrinterGeometry& printer_geometry, int selected_bed = -1);
 
 	// This is just a helper class to collect data for seq. arrangement, running the arrangement
 	// and applying the results to model. It is here so the processing itself can be offloaded
@@ -25,6 +32,9 @@ namespace Slic3r {
 		explicit SeqArrange(const Model& model, const ConfigBase& config, bool current_bed_only);
 		void process_seq_arrange(std::function<void(int)> progress_fn);
 		void apply_seq_arrange(Model& model) const;
+
+		// Result of process_seq_arrange, one entry per bed.
+		const std::vector<Sequential::ScheduledPlate>& get_plates() const { return m_plates; }
 
 	private:
 		// Following three are inputs, filled in by the constructor.

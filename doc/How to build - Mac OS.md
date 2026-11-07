@@ -105,6 +105,39 @@ To remove the limitation, simply delete the key `MinimumSDKVersion` from that fi
 
 ## Troubleshooting
 
+### `Could not determine OS X SDK version` when configuring `deps`
+
+Recent Xcode versions ship an unversioned SDK directory (`MacOSX.sdk` instead of e.g. `MacOSX14.5.sdk`),
+so the SDK version can no longer be inferred. Set the deployment target explicitly, either via
+`-DCMAKE_OSX_DEPLOYMENT_TARGET=<your macOS version>` on both the deps and the main `cmake` invocation,
+or once via the environment:
+
+```
+export MACOSX_DEPLOYMENT_TARGET=$(sw_vers -productVersion | cut -d. -f1-2)
+```
+
+### CMake 4.x refuses to configure some of the bundled dependencies
+
+CMake 4 removed compatibility with projects requiring CMake < 3.5, which affects several of the
+bundled dependencies. Restore it with:
+
+```
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
+```
+
+### OpenVDB / `IlmBase::Half can not be found` / `OPENVDB_ABI_VERSION_NUMBER` errors
+
+These are almost always caused by Homebrew packages leaking into the build. PrusaSlicer must be
+built against the bundled dependencies (`deps/build/destdir`), not against `brew install openvdb`
+(or `openexr`, `ilmbase`, `boost`, ...). In particular:
+
+- `IlmBase::Half can not be found` at configure time usually means the deps bundle was not built
+  (or `CMAKE_PREFIX_PATH` does not point to it) and CMake found a modern Homebrew OpenVDB instead.
+  OpenVDB ≥ 8 no longer uses IlmBase; the bundled find module is written for the OpenVDB version
+  built in `deps`.
+- Uninstalling the Homebrew `openvdb` package (or at least making sure `vdb_print` is not on
+  `PATH`) avoids a mismatched ABI version being detected from a foreign OpenVDB installation.
+
 ### `CMath::CMath` target not found
 
 At the moment (20.2.2024) PrusaSlicer cannot be built with CMake 3.28+. Use [CMake 3.27](https://github.com/Kitware/CMake/releases/tag/v3.27.9) instead. 

@@ -41,7 +41,7 @@ static bool can_arrange_selected_bed(const Model& model, int bed_idx)
 	return true;
 }
 
-static Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config)
+Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config)
 {
 	enum ShapeType {
 		BOX,
@@ -133,12 +133,12 @@ static Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config
 	return out;
 }
 
-static Sequential::SolverConfiguration get_solver_config(const Sequential::PrinterGeometry& printer_geometry)
+Sequential::SolverConfiguration get_solver_config(const Sequential::PrinterGeometry& printer_geometry)
 {
 	return Sequential::SolverConfiguration(printer_geometry);
 }
 
-static std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Model& model, const Sequential::PrinterGeometry& printer_geometry, int selected_bed)
+std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Model& model, const Sequential::PrinterGeometry& printer_geometry, int selected_bed)
 {
 	// First extract the heights of interest.
 	std::vector<double> heights;

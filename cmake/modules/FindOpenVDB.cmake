@@ -312,7 +312,13 @@ find_package_handle_standard_args(OpenVDB
 # ------------------------------------------------------------------------
 
 # Set the ABI number the library was built against. Uses vdb_print
-find_program(OPENVDB_PRINT vdb_print PATHS ${OpenVDB_INCLUDE_DIR} )
+# Only search next to the OpenVDB installation that was found above:
+# a vdb_print from $PATH (e.g. Homebrew) may belong to a different
+# OpenVDB and would report a mismatched ABI.
+find_program(OPENVDB_PRINT vdb_print
+  PATHS ${OpenVDB_INCLUDE_DIR}/../bin ${OpenVDB_INCLUDE_DIR}
+  NO_DEFAULT_PATH
+)
 
 OPENVDB_ABI_VERSION_FROM_PRINT(
   "${OPENVDB_PRINT}"
@@ -368,7 +374,7 @@ elseif(NOT IlmBase_FOUND)
 endif()
 find_package(TBB ${_quiet} ${_required} COMPONENTS tbb)
 find_package(ZLIB ${_quiet} ${_required})
-find_package(Boost ${_quiet} ${_required} COMPONENTS iostreams system )
+find_package(Boost ${_quiet} ${_required} COMPONENTS iostreams )
 
 # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
 # which we can query for optional deps. This basically runs ldd/otoll/objdump

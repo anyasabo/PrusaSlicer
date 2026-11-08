@@ -21,6 +21,10 @@
 #include <cstdlib>
 
 #include <boost/nowide/fstream.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
+#include <set>
+#include <sstream>
 #include <limits>
 #include "test_data.hpp"
 
@@ -277,4 +281,49 @@ TEST_CASE("Sequential print: travel to the next object clears the printed object
     REQUIRE(crossings > 0);
     INFO("lowest move over the tall object: " << lowest_crossing);
     CHECK(lowest_crossing_z >= tall_height);
+}
+
+TEST_CASE("Sequential print: geometries.json is valid", "[SequentialPrint]")
+{
+    // The file that ships with the slicer. ArrangeHelper.cpp does not use the data of a printer with an error
+    // in its entry: then the check uses the clearance values. Thus find the errors here.
+    namespace pt = boost::property_tree;
+    pt::ptree tree;
+    pt::read_json(std::string(TEST_DATA_DIR) + "/../../resources/data/printer_gantries/geometries.json", tree);
+
+    std::set<std::string> all_models;
+    for (const auto& printer : tree.get_child("printers")) {
+        std::vector<std::string> models;
+        for (const auto& model : printer.second.get_child("printer_models"))
+            models.push_back(model.second.data());
+        REQUIRE(! models.empty());
+        INFO("printer " << models.front());
+        for (const std::string& model : models) {
+            INFO("model " << model);
+            CHECK(all_models.insert(model).second); // each model id in one entry only
+        }
+
+        std::set<double> heights;
+        for (const auto& slice : printer.second.get_child("slices")) {
+            const double height = slice.second.get<double>("height");
+            INFO("height " << height);
+            CHECK(heights.insert(height).second); // one entry for each height
+            const std::string type = slice.second.get<std::string>("type");
+            CHECK((type == "convex" || type == "box"));
+            const auto polygons = slice.second.get_child("polygons");
+            CHECK(! polygons.empty());
+            for (const auto& polygon : polygons) {
+                std::string text = polygon.second.data();
+                std::replace(text.begin(), text.end(), ';', ' ');
+                std::replace(text.begin(), text.end(), ',', ' ');
+                std::istringstream ss(text);
+                int points = 0;
+                double x, y;
+                while (ss >> x >> y)
+                    ++points;
+                CHECK(points >= 3);
+            }
+        }
+        CHECK(heights.count(0.) == 1); // the nozzle level
+    }
 }

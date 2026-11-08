@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/replace.hpp>
+#include <Slic3r/Log.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
@@ -93,6 +94,16 @@ std::vector<ExtruderSlice> read_gantry_slices(const Domain::Preset::HwModel& hw_
 	} catch (const pt::ptree_error&) {
 		return {};
 	}
+	// One entry for each height. Put more polygons of one height into the "polygons" list of that entry.
+	// Two entries for one height are an error in the file: they can have different types, and a reader that
+	// keeps only one of them loses a part of the toolhead.
+	for (size_t i = 0; i < slices.size(); ++i)
+		for (size_t j = i + 1; j < slices.size(); ++j)
+			if (slices[i].height == slices[j].height) {
+				SPDLOG_ERROR("geometries.json: printer model {} has two slices at height {} mm. The gantry data is not used.",
+				             hw_model.model, unscaled(slices[i].height));
+				return {};
+			}
 	return slices;
 }
 
@@ -127,10 +138,7 @@ Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
 	out.plate = bed_polygon;
 	for (const ExtruderSlice& slice : slices) {
 		(slice.shape_type == ShapeType::Convex ? out.convex_heights : out.box_heights).emplace(slice.height);
-		// geometries.json can have more than one slice at the same height (the CORE One printers have two
-		// convex slices at 23 mm). Keep the polygons of all of them. std::map::insert() keeps only the first.
-		std::vector<Polygon>& polygons = out.extruder_slices[slice.height];
-		polygons.insert(polygons.end(), slice.polygons.begin(), slice.polygons.end());
+		out.extruder_slices.emplace(slice.height, slice.polygons); // read_gantry_slices() rejects two slices at one height
 	}
 	return out;
 }

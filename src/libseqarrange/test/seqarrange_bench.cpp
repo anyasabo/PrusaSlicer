@@ -65,7 +65,8 @@ const std::vector<std::string> default_printers{"MK4S", "COREONE", "COREONEL", "
 
 coord_t scaled_mm(double mm) { return coord_t(mm * 1000000.); }
 
-// Reads the slices of a printer model from geometries.json, as ArrangeHelper.cpp does.
+// Reads the slices of a printer model from geometries.json, as ArrangeHelper.cpp does. Two slices at one
+// height are an error, as in ArrangeHelper.cpp.
 std::optional<PrinterGeometry> read_printer_geometry(const boost::property_tree::ptree& tree, const std::string& model)
 {
     const auto bed = bed_sizes.find(model);
@@ -83,6 +84,10 @@ std::optional<PrinterGeometry> read_printer_geometry(const boost::property_tree:
         out.plate = Polygon{{0, 0}, {x, 0}, {x, y}, {0, y}};
         for (const auto& slice : printer.second.get_child("slices")) {
             const coord_t height = scaled_mm(slice.second.get<double>("height"));
+            if (out.extruder_slices.count(height) != 0) {
+                std::cerr << model << ": two slices at height " << slice.second.get<std::string>("height") << " mm\n";
+                return std::nullopt;
+            }
             const bool convex = slice.second.get<std::string>("type") != "box";
             (convex ? out.convex_heights : out.box_heights).insert(height);
             std::vector<Polygon>& polygons = out.extruder_slices[height];

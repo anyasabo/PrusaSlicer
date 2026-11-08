@@ -6,6 +6,7 @@
 #include "Slic3r/Domain/SlicingId.hpp"
 #include "Slic3r/Exception.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/ArrangeHelper.hpp"
 #include "libslic3r/Brim.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Extruder.hpp"
@@ -1512,7 +1513,19 @@ void Print::process()
         });
     }
 
-    m_sequential_collision_detected = config().get<bool>("complete_objects") ? std::nullopt /*check_seq_conflict(model(), config())*/ : std::nullopt;
+    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config()) : std::nullopt;
+    if (m_sequential_collision_detected) {
+        this->append_warning_callback(Biz::Slicing::Warning{
+            .code = Biz::Slicing::WarningCode::SequentialCollision,
+            .item_keys = {"complete_objects"},
+            .model_object_id = std::nullopt,
+            .payload = Biz::Slicing::SequentialCollisionWarningPayload{
+                .object_hit = m_sequential_collision_detected->first,
+                .object_printed = m_sequential_collision_detected->second
+            },
+            .severity = Biz::Slicing::WarningSeverity::HIGH
+        });
+    }
 
     SPDLOG_INFO("Slicing process finished. {}", log_memory_info());
 }

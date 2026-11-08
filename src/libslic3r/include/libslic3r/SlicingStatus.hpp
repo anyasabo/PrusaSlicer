@@ -146,7 +146,8 @@ enum class WarningCode
     GCodeConflict,
     XYSizeCompensationIgnoredMultiMaterialPainting,
     XYSizeCompensationIgnoredFuzzySkinPainting,
-    VirtualExtruderMixesFilamentTypes
+    VirtualExtruderMixesFilamentTypes,
+    SequentialCollision
 };
 
 struct StabilityWarningPayload {
@@ -171,13 +172,20 @@ struct GCodeConflictWarningPayload {
     double height{0.};
 };
 
+// Sequential printing: the extruder or gantry hits object_hit while it prints object_printed.
+struct SequentialCollisionWarningPayload {
+    std::string object_hit;
+    std::string object_printed;
+};
+
 using WarningPayload = std::variant<
     std::monostate,
     StabilityWarningPayload,
     EmptyLayersWarningPayload,
     CustomGCodeReservedKeywordsWarningPayload,
     InvalidToolchangeWarningPayload,
-    GCodeConflictWarningPayload
+    GCodeConflictWarningPayload,
+    SequentialCollisionWarningPayload
     >;
 
 enum class WarningSeverity {

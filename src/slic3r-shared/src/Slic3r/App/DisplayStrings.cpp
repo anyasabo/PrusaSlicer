@@ -362,6 +362,14 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
             detail.height, detail.object_names[0], detail.object_names[1]);
     }
 
+    case WarningCode::SequentialCollision: {
+        const auto& detail = std::get<Biz::Slicing::SequentialCollisionWarningPayload>(warning.payload);
+        // TRN {0} is the name of the object that is hit, {1} is the name of the object that is printed.
+        return fmt::format(fmt::runtime(_u8L("Extruder will crash into {0} while printing {1}. "
+            "Move the objects further apart or arrange them again.")),
+            detail.object_hit, detail.object_printed);
+    }
+
     case WarningCode::XYSizeCompensationIgnoredMultiMaterialPainting:
         message = _u8L(
             "An object has enabled XY size compensation which will not be used "

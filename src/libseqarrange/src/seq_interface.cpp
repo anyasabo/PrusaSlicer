@@ -14,6 +14,7 @@
 #include "seq_sequential.hpp"
 #include "seq_preprocess.hpp"
 #include "libseqarrange/seq_interface.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 
 /*----------------------------------------------------------------*/
@@ -79,7 +80,7 @@ bool PrinterGeometry::convert_Geometry2PlateBounds(Slic3r::BoundingBox &plate_bo
 {
     BoundingBox plate_box = get_extents(plate);
     
-    if (fabs(plate.area() - plate_box.polygon().area()) > EPSILON)
+    if (fabs(plate.area() - Slic3r::Biz::Algorithms::BoundingBox::to_polygon(plate_box).area()) > EPSILON)
     {
 	for (unsigned int i = 0; i < plate.points.size(); ++i)
 	{

@@ -15,6 +15,7 @@
 
 /*----------------------------------------------------------------*/
 
+#include <cmath>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -166,14 +167,33 @@ struct Rational
 	return numerator / denominator;
     }    
 
+    // The values of a z3 model can have numerators and denominators near the limit of int64_t (for example
+    // 8174910549444622849/12433328529426200). Then numerator + val * denominator overflows, and the result is a
+    // wrong point. If the exact result can overflow, use the normalized value (precision 1/SEQ_RATIONAL_PRECISION).
+    // The estimate in long double is not exact, so the limit is well below the int64_t limit (9.2e18).
+    static bool fits_int64(long double value)
+    {
+	return std::fabs(value) < 4.0e18L;
+    }
+
     Rational operator+(int64_t val) const
     {
-	return Rational(numerator + val * denominator, denominator);
+	if (fits_int64((long double)numerator + (long double)val * (long double)denominator))
+	{
+	    return Rational(numerator + val * denominator, denominator);
+	}
+	const Rational normalized = normalize();
+	return Rational(normalized.numerator + val * normalized.denominator, normalized.denominator);
     }
 
     Rational operator*(int64_t val) const
     {
-	return Rational(numerator * val, denominator);
+	if (fits_int64((long double)numerator * (long double)val))
+	{
+	    return Rational(numerator * val, denominator);
+	}
+	const Rational normalized = normalize();
+	return Rational(normalized.numerator * val, normalized.denominator);
     }
 
     Rational normalize(void) const

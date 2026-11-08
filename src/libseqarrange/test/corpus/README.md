@@ -13,11 +13,10 @@ printer. It checks each result and writes one JSON line for each case and printe
   RelWithDebInfo, Ryzen 7 8700G). The times are for this machine only. On another machine, make a new
   baseline before a change, and compare with it.
 
-## Known failure
+## Found errors
 
-`random_11` on the CORE One: the layout of the arrange fails the collision check (objects 7 and 3). The
-conflict is also in the exact polygons, and also with only the two objects. Thus the arrange can give a
-layout that the check of the same library rejects.
+Before the fix of `Rational` (int64_t overflow), `random_11` on the CORE One gave a layout that failed the
+collision check (objects 7 and 3). The fix changed only this layout.
 
 ## Run
 

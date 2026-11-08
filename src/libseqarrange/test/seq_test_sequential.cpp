@@ -2533,3 +2533,22 @@ TEST_CASE("Sequential test 7", "[Sequential Arrangement Core]")
 
 
 /*----------------------------------------------------------------*/
+
+
+TEST_CASE("Rational: add and multiply do not overflow", "[Sequential Arrangement Core]")
+{
+    // A value from a z3 model of the arrange: 657.5 solver units, with a large numerator and denominator.
+    const Rational x(8174910549444622849LL, 12433328529426200LL);
+    REQUIRE(x.as_double() == Catch::Approx(657.4998).epsilon(1e-6));
+
+    // Before the fix, numerator + 200 * denominator overflowed int64_t.
+    CHECK((x + 200).as_double() == Catch::Approx(857.4998).epsilon(1e-6));
+    CHECK((x + -3000).as_double() == Catch::Approx(-2342.5002).epsilon(1e-6));
+    CHECK((x * 1000).as_double() == Catch::Approx(657499.8).epsilon(1e-6));
+
+    // Small values stay exact.
+    const Rational y(1, 3);
+    CHECK((y + 2).numerator == 7);
+    CHECK((y + 2).denominator == 3);
+    CHECK((y * 4).numerator == 4);
+}

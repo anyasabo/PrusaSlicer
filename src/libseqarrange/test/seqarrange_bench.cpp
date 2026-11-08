@@ -16,7 +16,9 @@
 // inside the bed. If not, the line has "ok": false, and the exit code is 1.
 //
 // Usage: seqarrange_bench --geometries geometries.json [--printers A,B] [--rlimit N] [--timeout MS]
-//                         [--repeat N] [--decimation low|high|none] [--no-fork] FILE_OR_DIR ...
+//                         [--repeat N] [--decimation low|high|none] [--max-refines N] [--group-size N]
+//                         [--no-fork] FILE_OR_DIR ...
+// --max-refines, --group-size: SolverConfiguration::max_refines and object_group_size (defaults 2 and 4).
 // Each run is in a child process (see run()). --no-fork runs all in this process, for a profiler.
 // --decimation: the tolerance of the polygon decimation. "low" (0.15 mm) is the default of SolverConfiguration,
 // "high" is 0.65 mm. The names are from DecimationPrecision.
@@ -349,6 +351,8 @@ int main(int argc, char** argv)
     int repeat = 1;
     std::string decimation = "low";
     bool in_child = true;
+    int max_refines = 0;      // 0: the default of SolverConfiguration
+    int group_size = 0;       // 0: the default of SolverConfiguration
     std::vector<fs::path> inputs;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
@@ -371,6 +375,10 @@ int main(int argc, char** argv)
             rlimit = next();
         else if (a == "--timeout")
             timeout = next();
+        else if (a == "--max-refines")
+            max_refines = std::stoi(next());
+        else if (a == "--group-size")
+            group_size = std::stoi(next());
         else if (a == "--no-fork")
             in_child = false;
         else if (a == "--decimation")
@@ -426,6 +434,10 @@ int main(int argc, char** argv)
                 config.set_DecimationPrecision(SEQ_DECIMATION_PRECISION_HIGH);
             else if (decimation == "none")
                 config.set_DecimationPrecision(SEQ_DECIMATION_PRECISION_UNDEFINED);
+            if (max_refines > 0)
+                config.max_refines = max_refines;
+            if (group_size > 0)
+                config.set_ObjectGroupSize(group_size);
             if (! timeout.empty())
                 config.optimization_timeout = timeout;
             else if (rlimit != "0")
@@ -517,7 +529,8 @@ int main(int argc, char** argv)
                 js << (i ? "," : "") << areas[i];
             js << "],\"wall_ms\":" << times[times.size() / 2] << ",\"wall_ms_min\":" << times.front()
                << ",\"checks\":" << r.stats.checks << ",\"sat\":" << r.stats.sat << ",\"unsat\":" << r.stats.unsat
-               << ",\"unknown\":" << r.stats.unknown << ",\"rlimit\":\"" << rlimit << "\",\"decimation\":\"" << decimation << "\",\"repeat\":" << repeat
+               << ",\"unknown\":" << r.stats.unknown << ",\"rlimit\":\"" << rlimit << "\",\"decimation\":\"" << decimation << "\",\"max_refines\":" << config.max_refines
+               << ",\"group_size\":" << config.object_group_size << ",\"repeat\":" << repeat
                << ",\"deterministic\":" << (deterministic ? "true" : "false") << ",\"layout\":\"" << layout_key(r.plates) << "\"}";
             std::cout << js.str() << std::endl;
         }

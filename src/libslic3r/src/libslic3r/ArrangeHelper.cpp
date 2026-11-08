@@ -127,7 +127,10 @@ Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
 	out.plate = bed_polygon;
 	for (const ExtruderSlice& slice : slices) {
 		(slice.shape_type == ShapeType::Convex ? out.convex_heights : out.box_heights).emplace(slice.height);
-		out.extruder_slices.insert(std::make_pair(slice.height, slice.polygons));
+		// geometries.json can have more than one slice at the same height (the CORE One printers have two
+		// convex slices at 23 mm). Keep the polygons of all of them. std::map::insert() keeps only the first.
+		std::vector<Polygon>& polygons = out.extruder_slices[slice.height];
+		polygons.insert(polygons.end(), slice.polygons.begin(), slice.polygons.end());
 	}
 	return out;
 }

@@ -120,3 +120,30 @@ TEST_CASE("Sequential print: gantry data of the printer model", "[SequentialPrin
         CHECK(conflict.has_value());
     }
 }
+
+TEST_CASE("Sequential print: all gantry slices at one height are used", "[SequentialPrint]")
+{
+    struct ResourcesDirGuard
+    {
+        std::string old{resources_dir()};
+        ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+        ~ResourcesDirGuard() { set_resources_dir(old); }
+    } resources_dir_guard;
+
+    // The CORE One has two convex slices at 23 mm. The second one (Y -98 to -47 mm) reaches 29 mm farther
+    // than the 2 mm slice (Y -69 to 20 mm). Mirrored and with the two 20 mm footprints, the 2 mm slice makes
+    // the band up to +89 mm in Y unreachable, and the second 23 mm slice the band up to +118 mm.
+    // The first object is 102 mm in +Y from the second object.
+    const Domain::Preset::HwModel core_one{.model = "COREONE", .base_model = "COREONE"};
+
+    SECTION("An object above 23 mm is hit by the second slice") {
+        const auto conflict = check({{"tall", 100., 152., 30.}, {"b", 100., 50., 10.}}, 1., 1., core_one);
+        REQUIRE(conflict.has_value());
+        CHECK(conflict->first == "tall");
+        CHECK(conflict->second == "b");
+    }
+
+    SECTION("An object below 23 mm is not hit") {
+        CHECK(! check({{"low", 100., 152., 20.}, {"b", 100., 50., 10.}}, 1., 1., core_one).has_value());
+    }
+}

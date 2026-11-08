@@ -27,6 +27,11 @@ if (SLIC3R_BUILD_TESTS)
     target_include_directories(libseqarrange_tests PRIVATE src )
     target_link_libraries(libseqarrange_tests PRIVATE Catch2::Catch2WithMain libseqarrange)
 
+    # Benchmark and quality check of the arrange with the corpus in test/corpus (see test/seqarrange_bench.cpp).
+    add_executable(seqarrange_bench test/seqarrange_bench.cpp)
+    target_include_directories(seqarrange_bench PRIVATE src)
+    target_link_libraries(seqarrange_bench PRIVATE libseqarrange)
+
     set(_catch_args "exclude:[NotWorking] exclude:[Slow]")
     list(APPEND _catch_args "${CATCH_EXTRA_ARGS}")
     add_test(NAME libseqarrange_tests

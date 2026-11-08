@@ -88,7 +88,26 @@ struct SolverConfiguration
 
     DecimationPrecision decimation_precision;   
     std::string optimization_timeout;    
+    // The z3 resource limit (rlimit) of each solver call. "0" means no limit. A wall-time timeout gives
+    // results that change with the machine load. For repeatable results (tests, benchmarks), set a
+    // resource limit and set optimization_timeout to SEQ_NO_TIMEOUT.
+    std::string optimization_rlimit;
 };
+
+// The value of SolverConfiguration::optimization_timeout that disables the wall-time timeout.
+inline const char* const SEQ_NO_TIMEOUT = "4294967295";
+
+// Counts of the z3 solver calls. A call that hits the timeout or the resource limit returns "unknown".
+struct SolverStatistics
+{
+    long checks = 0;
+    long sat = 0;
+    long unsat = 0;
+    long unknown = 0;
+};
+
+SolverStatistics get_SolverStatistics();
+void reset_SolverStatistics();
 
     
 /*----------------------------------------------------------------*/

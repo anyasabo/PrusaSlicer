@@ -111,6 +111,7 @@ SolverConfiguration::SolverConfiguration()
     , temporal_spread(SEQ_SCHEDULING_TEMPORAL_SPREAD)
     , decimation_precision(SEQ_DECIMATION_PRECISION_LOW)
     , optimization_timeout(SEQ_Z3_SOLVER_TIMEOUT)
+    , optimization_rlimit("0")
 {
 	/* nothing */
 }
@@ -125,6 +126,7 @@ SolverConfiguration::SolverConfiguration(const PrinterGeometry &printer_geometry
     , temporal_spread(SEQ_SCHEDULING_TEMPORAL_SPREAD)
     , decimation_precision(SEQ_DECIMATION_PRECISION_LOW)
     , optimization_timeout(SEQ_Z3_SOLVER_TIMEOUT)
+    , optimization_rlimit("0")
 {
     setup(printer_geometry);
 }

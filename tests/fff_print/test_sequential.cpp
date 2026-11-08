@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <memory>
 #include <optional>
@@ -11,10 +12,21 @@
 #include "Slic3r/Domain/Model.hpp"
 #include "libslic3r/ArrangeHelper.hpp"
 #include "libslic3r/ConfigViews.hpp"
+#include "libslic3r/Print.hpp"
+#include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
+#include "Slic3r/Biz/Slicing/BackgroundProcess.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+
+#include <boost/nowide/fstream.hpp>
+#include <limits>
 #include "test_data.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
+using Catch::Approx;
 
 using Biz::Algorithms::ModelObject::add_volume;
 
@@ -146,4 +158,123 @@ TEST_CASE("Sequential print: all gantry slices at one height are used", "[Sequen
     SECTION("An object below 23 mm is not hit") {
         CHECK(! check({{"low", 100., 152., 20.}, {"b", 100., 50., 10.}}, 1., 1., core_one).has_value());
     }
+}
+
+namespace {
+
+// Slices the boxes with complete_objects and returns the G-code. Without a printer model, the collision check
+// uses the clearance values. A conflict gives only a warning, so the G-code is generated.
+// If the environment variable SEQ_TEST_GCODE_DUMP is set, the G-code is also written to that file.
+std::string slice_sequential(const std::vector<Placement>& placements)
+{
+    TestConfig config;
+    config.print.items.opt("complete_objects").set(true);
+    config.print.items.opt("gcode_comments").set(true);
+    config.print.items.opt("skirts").set(0);
+    config.print.items.opt("layer_height").set(0.2);
+    config.print.items.opt("first_layer_height").set(Domain::FloatOrPercentage{0.2});
+
+    Domain::Model model;
+    add_boxes(model, placements);
+    Print print;
+    Domain::Preset::SelectedPresetMetadata preset_metadata = create_dummy_selected_preset_metadata(config.hw_config);
+    auto gcode_metadata = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
+    Domain::Bed model_bed;
+    Domain::BedInstance bed_instance{model_bed};
+    for (const Domain::ModelObject* object : model.objects)
+        for (Domain::ModelInstance* instance : object->instances)
+            bed_instance.model_instances.push_back(instance);
+    print.update(model, config, bed_instance, preset_metadata,
+                 Biz::Slicing::build_metadata_serializer(gcode_metadata, preset_metadata, config));
+    print.validate();
+    const std::string gcode = Test::gcode(print);
+    if (const char* dump = std::getenv("SEQ_TEST_GCODE_DUMP"))
+        boost::nowide::ofstream(dump) << gcode;
+    return gcode;
+}
+
+// Returns the XY targets of the moves to the next object, in G-code order.
+std::vector<Vec2d> next_object_moves(const std::string& gcode)
+{
+    std::vector<Vec2d> out;
+    Biz::GCodeReader::GCodeReader reader;
+    reader.parse_buffer(gcode, [&](Biz::GCodeReader::GCodeReader& self, const Biz::GCodeReader::GCodeReader::GCodeLine& line) {
+        if (line.comment().find("move to origin position for next object") != std::string_view::npos)
+            out.emplace_back(line.new_X(self), line.new_Y(self));
+    });
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("Sequential print: objects are printed in model order", "[SequentialPrint]")
+{
+    // 17 low boxes in a 6 x 3 grid, in an order that is not sorted by position. Before the fix, the order
+    // came from the memory addresses of the print instances.
+    std::vector<Placement> placements;
+    for (int i = 0; i < 17; ++i) {
+        const int k = (i * 7) % 17; // a permutation of 0..16
+        placements.push_back({"box" + std::to_string(i), 20. + 30. * (k % 6), 40. + 50. * (k / 6), 2.});
+    }
+    const std::vector<Vec2d> moves = next_object_moves(slice_sequential(placements));
+    REQUIRE(moves.size() == placements.size() - 1);
+    for (size_t i = 1; i < placements.size(); ++i) {
+        INFO("object " << i);
+        CHECK(moves[i - 1].x() == Approx(placements[i].x));
+        CHECK(moves[i - 1].y() == Approx(placements[i].y));
+    }
+}
+
+TEST_CASE("Sequential print: travel to the next object clears the printed objects", "[SequentialPrint]")
+{
+    // The tall object is printed first, between the two low objects. The travel from the first low object to
+    // the second low object crosses the tall object. Before this travel, GCode.cpp lifts Z to the highest
+    // printed layer ("ensure z position to clear all already printed objects").
+    const double tall_height = 25.;
+    const std::vector<Placement> placements{{"tall", 100., 100., tall_height}, {"low1", 30., 100., 5.}, {"low2", 170., 100., 5.}};
+    const std::string gcode = slice_sequential(placements);
+
+    // The objects are printed in model order.
+    const std::vector<Vec2d> moves = next_object_moves(gcode);
+    REQUIRE(moves.size() == 2);
+    CHECK(moves[0].x() == Approx(30.));
+    CHECK(moves[1].x() == Approx(170.));
+
+    // The footprint of the tall object, 1 mm larger on each side.
+    const double min_x = 100. - 11., max_x = 100. + 11., min_y = 100. - 11., max_y = 100. + 11.;
+    const auto crosses_tall = [&](double x0, double y0, double x1, double y1) {
+        const double len = std::hypot(x1 - x0, y1 - y0);
+        const int steps = std::max(1, int(len / 0.25));
+        for (int i = 0; i <= steps; ++i) {
+            const double t = double(i) / steps;
+            const double x = x0 + t * (x1 - x0), y = y0 + t * (y1 - y0);
+            if (x > min_x && x < max_x && y > min_y && y < max_y)
+                return true;
+        }
+        return false;
+    };
+
+    int objects_done = 0;
+    int crossings = 0;
+    double lowest_crossing_z = std::numeric_limits<double>::max();
+    std::string lowest_crossing;
+    Biz::GCodeReader::GCodeReader reader;
+    reader.parse_buffer(gcode, [&](Biz::GCodeReader::GCodeReader& self, const Biz::GCodeReader::GCodeReader::GCodeLine& line) {
+        if (line.comment().find("move to origin position for next object") != std::string_view::npos)
+            ++objects_done;
+        // After the tall object is done, each move that crosses it must be above it.
+        if (objects_done > 0 && line.cmd_is("G1") && line.dist_XY(self) > 0. &&
+            crosses_tall(self.x(), self.y(), line.new_X(self), line.new_Y(self))) {
+            ++crossings;
+            if (double(line.new_Z(self)) < lowest_crossing_z) {
+                lowest_crossing_z = double(line.new_Z(self));
+                lowest_crossing = "from X" + std::to_string(self.x()) + " Y" + std::to_string(self.y()) + ": " + line.raw();
+            }
+        }
+    });
+
+    // The travel from low1 to low2 crosses the tall object.
+    REQUIRE(crossings > 0);
+    INFO("lowest move over the tall object: " << lowest_crossing);
+    CHECK(lowest_crossing_z >= tall_height);
 }

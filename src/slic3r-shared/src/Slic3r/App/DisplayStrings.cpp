@@ -364,6 +364,16 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
 
     case WarningCode::SequentialCollision: {
         const auto& detail = std::get<Biz::Slicing::SequentialCollisionWarningPayload>(warning.payload);
+        if (! detail.working_order.empty()) {
+            std::string order;
+            for (const std::string& name : detail.working_order)
+                order += (order.empty() ? "" : ", ") + name;
+            // TRN {0} is the name of the object that is hit, {1} is the name of the object that is printed,
+            // {2} is a list of object names in print order.
+            return fmt::format(fmt::runtime(_u8L("Extruder will crash into {0} while printing {1}. "
+                "Print the objects in this order to avoid it: {2}.")),
+                detail.object_hit, detail.object_printed, order);
+        }
         // TRN {0} is the name of the object that is hit, {1} is the name of the object that is printed.
         return fmt::format(fmt::runtime(_u8L("Extruder will crash into {0} while printing {1}. "
             "Move the objects further apart or arrange them again.")),

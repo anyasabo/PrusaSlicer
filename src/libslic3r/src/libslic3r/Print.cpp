@@ -1521,7 +1521,8 @@ void Print::process()
             .model_object_id = std::nullopt,
             .payload = Biz::Slicing::SequentialCollisionWarningPayload{
                 .object_hit = m_sequential_collision_detected->first,
-                .object_printed = m_sequential_collision_detected->second
+                .object_printed = m_sequential_collision_detected->second,
+                .working_order = find_seq_print_order(model(), config()).value_or(std::vector<std::string>{})
             },
             .severity = Biz::Slicing::WarningSeverity::HIGH
         });

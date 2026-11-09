@@ -174,7 +174,39 @@ std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model&
 	return objects;
 }
 
+// The printable instances in model order, at their positions.
+Sequential::ScheduledPlate get_plate(const Domain::Model& model)
+{
+	Sequential::ScheduledPlate plate;
+	for (const Domain::ModelObject* mo : model.objects)
+		for (const Domain::ModelInstance* mi : mo->instances)
+			if (mi->printable)
+				plate.scheduled_objects.emplace_back(int(mi->id().id), scaled(mi->get_offset().x()), scaled(mi->get_offset().y()));
+	return plate;
+}
+
 } // namespace
+
+std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config)
+{
+	Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
+	if (printer_geometry.extruder_slices.empty())
+		return std::nullopt;
+	Sequential::SolverConfiguration solver_config(printer_geometry);
+	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry);
+	const std::optional<std::vector<int>> order =
+		Sequential::find_ObjectOrderForSequentialPrint(solver_config, printer_geometry, objects, get_plate(model));
+	if (! order)
+		return std::nullopt;
+
+	std::vector<std::string> names;
+	for (int id : *order)
+		for (const Domain::ModelObject* mo : model.objects)
+			for (size_t k = 0; k < mo->instances.size(); ++k)
+				if (int(mo->instances[k]->id().id) == id)
+					names.push_back(mo->instances.size() > 1 ? mo->name + " (" + std::to_string(k + 1) + ")" : mo->name);
+	return names;
+}
 
 std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Domain::Model& model, const PrintConfigView& config)
 {
@@ -188,11 +220,7 @@ std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Doma
 		return std::nullopt;
 
 	// The print order is the model order (see sort_object_instances_by_model_order() in GCode.cpp).
-	Sequential::ScheduledPlate plate;
-	for (const Domain::ModelObject* mo : model.objects)
-		for (const Domain::ModelInstance* mi : mo->instances)
-			if (mi->printable)
-				plate.scheduled_objects.emplace_back(int(mi->id().id), scaled(mi->get_offset().x()), scaled(mi->get_offset().y()));
+	const Sequential::ScheduledPlate plate = get_plate(model);
 
 	std::optional<std::pair<int, int>> conflict = Sequential::check_ScheduledObjectsForSequentialConflict(
 		solver_config, printer_geometry, objects, std::vector<Sequential::ScheduledPlate>(1, plate));

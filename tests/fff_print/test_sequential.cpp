@@ -327,3 +327,40 @@ TEST_CASE("Sequential print: geometries.json is valid", "[SequentialPrint]")
         CHECK(heights.count(0.) == 1); // the nozzle level
     }
 }
+
+TEST_CASE("Sequential print: a working print order for fixed positions", "[SequentialPrint]")
+{
+    // Clearance fallback (radius 20, height 20): a 40 x 40 mm toolhead box, and a gantry band of 40 mm in Y
+    // that spans X at 20 mm. The tall object (25 mm) reaches the gantry. The low object is 100 mm away in X,
+    // so the toolhead box does not reach the other object in either order. Printed first, the tall object is
+    // hit by the gantry while the low object (15 mm away in Y) prints. Printed last, nothing is hit: the
+    // low object is below the gantry.
+    const std::vector<Placement> placements{{"tall", 60., 100., 25.}, {"low", 160., 115., 5.}};
+
+    TestConfig config;
+    config.print.items.opt("complete_objects").set(true);
+    config.printer.items.opt("extruder_clearance_radius").set(20.);
+    config.printer.items.opt("extruder_clearance_height").set(20.);
+    const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+
+    Domain::Model model;
+    add_boxes(model, placements);
+    REQUIRE(check_seq_conflict(model, view).has_value());
+
+    const auto order = find_seq_print_order(model, view);
+    REQUIRE(order.has_value());
+    CHECK(*order == std::vector<std::string>{"low", "tall"});
+
+    // The model in that order has no conflict.
+    Domain::Model reordered;
+    add_boxes(reordered, {placements[1], placements[0]});
+    CHECK(! check_seq_conflict(reordered, view).has_value());
+
+    SECTION("Two tall objects in the same gantry band have no order")
+    {
+        Domain::Model both_tall;
+        add_boxes(both_tall, {{"tall1", 60., 100., 25.}, {"tall2", 160., 100., 25.}});
+        CHECK(check_seq_conflict(both_tall, view).has_value());
+        CHECK(! find_seq_print_order(both_tall, view).has_value());
+    }
+}

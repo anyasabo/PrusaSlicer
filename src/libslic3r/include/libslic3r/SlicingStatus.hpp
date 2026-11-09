@@ -7,6 +7,8 @@
 #include <ostream>
 #include <variant>
 #include <map>
+#include <string>
+#include <vector>
 
 
 namespace Slic3r::Biz::Slicing {
@@ -176,6 +178,8 @@ struct GCodeConflictWarningPayload {
 struct SequentialCollisionWarningPayload {
     std::string object_hit;
     std::string object_printed;
+    // A print order that has no collision, as names. Empty if no order works.
+    std::vector<std::string> working_order;
 };
 
 using WarningPayload = std::variant<

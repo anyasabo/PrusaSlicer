@@ -418,6 +418,7 @@ set(SLIC3R_PUBLIC_HEADERS
     include/libslic3r/IPrint.hpp
     include/libslic3r/InitPrint.hpp
     include/libslic3r/PrintSteps.hpp
+    include/libslic3r/SeqArrange.hpp
     include/libslic3r/SerializedConfig.hpp
     include/libslic3r/SLAResult.hpp
     include/libslic3r/Slicing.hpp

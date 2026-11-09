@@ -90,6 +90,21 @@ private:
     void process_added_arrange_queue();
     void notify_added_arranged();
 
+    /**
+     * @brief The sequential arrange (complete_objects), see libslic3r/SeqArrange.hpp. It places the instances
+     *        of the beds and sets the order of the objects (the print order).
+     * @return False if the sequential arrange does not apply: the print is not sequential, or a bed has fixed
+     *         instances (the solver cannot keep instances fixed). Then the caller uses the normal arrange.
+     */
+    bool arrange_sequential(
+        const Domain::SelectionId project_id,
+        const std::vector<BedToArrange>& beds,
+        std::optional<std::size_t> config_container_to_add_beds,
+        const Domain::ConstModelInstanceList& extra,
+        std::function<void()> on_finished,
+        const std::string& job_name
+    );
+
     void apply_local_arrange_result(
         const Domain::SelectionId project_id,
         const std::vector<std::pair<Domain::BedRef, Pack>>& packs,

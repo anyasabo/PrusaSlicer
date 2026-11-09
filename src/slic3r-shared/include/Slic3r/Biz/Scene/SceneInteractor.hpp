@@ -167,6 +167,13 @@ public:
     {}
 
     /**
+     * @brief Called when the order of the model objects in the project changed.
+     * The order of the objects is the print order of a sequential print.
+     * @param project_id Project of the objects
+     */
+    virtual void on_objects_reordered(Domain::SelectionId project_id) {}
+
+    /**
      * @brief Called whenever volumes mesh is changed.
      * @param project_id Project the instances belong to
      * @param volumes List of volumes with changed mesh
@@ -391,6 +398,15 @@ public:
         const Domain::ElementRef& target,
         VolumeInsertPosition position
     );
+
+    /**
+     * @brief Changes the order of the model objects in the selected project.
+     * The objects in @p object_ids take the places of these objects in the model, in the given order.
+     * The other objects keep their places. In a sequential print (complete_objects), the order of
+     * the objects is the print order. Unknown ids are ignored.
+     * @return True if the order changed.
+     */
+    bool reorder_objects(const std::vector<size_t>& object_ids);
 
     void set_printable(const Domain::ElementRef& id, bool is_printable);
     void set_selected_instances_printable(bool is_printable);

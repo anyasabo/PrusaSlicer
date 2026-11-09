@@ -67,6 +67,7 @@ public:
         const Domain::ElementRefs& instances
     ) override;
     void on_model_reloaded(Domain::SelectionId project_id) override;
+    void on_objects_reordered(Domain::SelectionId project_id) override;
     void on_element_renamed(Domain::SelectionId project_id, const Domain::ElementRef& id) override;
 
     void on_volume_added(

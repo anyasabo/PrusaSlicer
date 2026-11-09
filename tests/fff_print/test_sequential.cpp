@@ -2,6 +2,7 @@
 #include <catch2/catch_approx.hpp>
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -14,6 +15,7 @@
 #include "libslic3r/ArrangeHelper.hpp"
 #include "libslic3r/ConfigViews.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/SeqArrange.hpp"
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include "Slic3r/Biz/Slicing/BackgroundProcess.hpp"
 
@@ -571,4 +573,114 @@ TEST_CASE("Sequential print: the suggested order keeps the instances of an objec
     const auto order = find_seq_print_order(model, view);
     REQUIRE(order.has_value());
     CHECK(*order == std::vector<std::string>{"low", "pair (1)", "pair (2)"});
+}
+
+TEST_CASE("Sequential print: the arrange gives plates without a collision", "[SequentialPrint]")
+{
+    struct ResourcesDirGuard
+    {
+        std::string old{resources_dir()};
+        ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+        ~ResourcesDirGuard() { set_resources_dir(old); }
+    } resources_dir_guard;
+
+    TestConfig config;
+    config.hw_config.model = {.model = "COREONE", .base_model = "COREONE"};
+    config.print.items.opt("complete_objects").set(true);
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{{0., 0.}, {250., 0.}, {250., 220.}, {0., 220.}});
+    const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+
+    // Boxes of 20 x 20 mm, all at one position. Some are taller than the gantry (33 mm) or the ceiling box (99 mm).
+    // The last object has 3 instances.
+    const std::vector<double> heights{10., 40., 10., 25., 50., 10., 105., 15., 30., 10.};
+    Domain::Model model;
+    std::vector<Placement> boxes;
+    for (size_t i = 0; i < heights.size(); ++i)
+        boxes.push_back({"box" + std::to_string(i), 100., 100., heights[i]});
+    add_boxes(model, boxes);
+    for (int k = 0; k < 2; ++k)
+        model.objects.back()->add_instance()->set_offset(Vec3d(100., 100., 0.));
+
+    std::vector<size_t> ids;
+    std::map<size_t, std::pair<const Domain::ModelObject*, double>> by_instance;
+    for (size_t i = 0; i < model.objects.size(); ++i)
+        for (const Domain::ModelInstance* mi : model.objects[i]->instances) {
+            ids.push_back(mi->id().id);
+            by_instance[mi->id().id] = {model.objects[i], heights[i]};
+        }
+
+    const SeqArrange seq_arrange(model, view, ids);
+    REQUIRE(! seq_arrange.empty());
+    CHECK(seq_arrange.not_arranged().empty());
+    int last_progress = -1;
+    const std::vector<SeqArrange::Plate> plates = seq_arrange.process([&last_progress](int p) {
+        CHECK(p >= 0);
+        CHECK(p <= 100);
+        last_progress = p;
+    });
+    CHECK(last_progress == 100);
+    REQUIRE(! plates.empty());
+
+    std::set<size_t> placed;
+    for (const SeqArrange::Plate& plate : plates) {
+        // The objects of the plate in print order, at their new positions. Each object has its instances, one after
+        // the other: the instances of one object must be together.
+        Domain::Model plate_model;
+        const Domain::ModelObject* last_source = nullptr;
+        for (const SeqArrange::Placement& p : plate) {
+            CHECK(placed.insert(p.instance_id).second);
+            const auto& [source, height] = by_instance.at(p.instance_id);
+            CHECK(p.x >= 10.);
+            CHECK(p.x <= 240.);
+            CHECK(p.y >= 10.);
+            CHECK(p.y <= 210.);
+            if (source != last_source) {
+                add_boxes(plate_model, {{source->name, p.x, p.y, height}});
+                last_source = source;
+            } else
+                plate_model.objects.back()->add_instance()->set_offset(Vec3d(p.x, p.y, 0.));
+        }
+        CHECK(! check_seq_conflict(plate_model, view).has_value());
+    }
+    CHECK(placed.size() == ids.size());
+
+    // The 3 instances of the last object are on one plate, one after the other.
+    const Domain::ModelObject* last = model.objects.back();
+    bool together = false;
+    for (const SeqArrange::Plate& plate : plates)
+        for (size_t i = 0; i + 2 < plate.size(); ++i)
+            together |= plate[i].instance_id == last->instances[0]->id().id &&
+                        plate[i + 1].instance_id == last->instances[1]->id().id &&
+                        plate[i + 2].instance_id == last->instances[2]->id().id;
+    CHECK(together);
+}
+
+TEST_CASE("Sequential print: the arrange does not place an object larger than the bed", "[SequentialPrint]")
+{
+    struct ResourcesDirGuard
+    {
+        std::string old{resources_dir()};
+        ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+        ~ResourcesDirGuard() { set_resources_dir(old); }
+    } resources_dir_guard;
+
+    TestConfig config;
+    config.hw_config.model = {.model = "COREONE", .base_model = "COREONE"};
+    config.print.items.opt("complete_objects").set(true);
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{{0., 0.}, {250., 0.}, {250., 220.}, {0., 220.}});
+    const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+
+    Domain::Model model;
+    add_boxes(model, {{"small", 100., 100., 10.}});
+    Domain::ModelObject* large = model.add_object();
+    large->name = "large";
+    add_volume(large, mesh(TestMesh::cube_20x20x20, Vec3d(-10., -10., 0.), Vec3d(15., 1., 1.)));
+    large->add_instance()->set_offset(Vec3d(100., 100., 0.));
+
+    const SeqArrange seq_arrange(model, view, {model.objects[0]->instances[0]->id().id, large->instances[0]->id().id});
+    REQUIRE(seq_arrange.not_arranged().size() == 1);
+    CHECK(seq_arrange.not_arranged().front() == large->instances[0]->id().id);
+    const std::vector<SeqArrange::Plate> plates = seq_arrange.process([](int) {});
+    REQUIRE(plates.size() == 1);
+    CHECK(plates.front().size() == 1);
 }

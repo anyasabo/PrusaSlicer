@@ -7,9 +7,11 @@
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
 #include "Slic3r/Domain/ConfigDefsFDM.hpp"
+#include "Slic3r/Domain/FullConfigFDM.hpp"
 
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
+#include "libslic3r/SeqArrange.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp" // project_mesh
 #include <ranges>
 
@@ -748,6 +750,10 @@ void ArrangeInteractor::arrange(
         return;
     }
 
+    if (arrange_sequential(project_id, beds, config_container_to_add_beds, extra, on_finished, job_name)) {
+        return;
+    }
+
     for (const ModelInstance* instance : extra) {
         if (!check_coord_bounds(to_2d(instance_bounding_box(*instance)))) {
             invoke_listeners<IArrangeEventsListener>(
@@ -814,6 +820,170 @@ void ArrangeInteractor::arrange(
                 }
             })
         .start();
+}
+
+namespace {
+
+// The print config of the beds as a config view, if the beds print sequentially (complete_objects) and no bed has
+// fixed instances. libseqarrange has no fixed objects: a sequential arrange places all instances of the beds.
+std::optional<Domain::ConfigView> sequential_config(const Project& project, const std::vector<BedToArrange>& beds)
+{
+    if (beds.empty()) {
+        return std::nullopt;
+    }
+    for (const BedToArrange& bed : beds) {
+        if (!bed.fixed.empty() || bed.ref.config_container_id != beds.front().ref.config_container_id) {
+            return std::nullopt;
+        }
+    }
+    const ConfigContainer* config_container{project.find_config_container(beds.front().ref.config_container_id)};
+    if (!config_container) {
+        return std::nullopt;
+    }
+    const ConfigPack pack{config_container->build_print_config()};
+    const ConfigPackFDM* fdm{std::get_if<ConfigPackFDM>(&pack)};
+    if (!fdm || !fdm->print.items.opt("complete_objects").get<bool>()) {
+        return std::nullopt;
+    }
+    const Domain::FullConfigPtr full_config{std::make_shared<const Domain::FullConfigFDM>(
+        *fdm, std::vector<unsigned>{0}, config_container->selected_preset().metadata().hw_config)};
+    Domain::ConfigView view{full_config, {}};
+    view.finalize();
+    return view;
+}
+
+using SeqPlates = std::vector<SeqArrange::Plate>;
+
+std::optional<SeqPlates> arrange_sequential_job(StopToken stop_token, ProgressTracker progress_tracker, const SeqArrange seq_arrange)
+{
+    int last_progress{-1};
+    try {
+        return seq_arrange.process([&](int progress) {
+            if (stop_token.stop_requested()) {
+                throw CanceledException{};
+            }
+            // ProgressTracker::set() must not go back, and each call goes to the main thread.
+            if (progress > last_progress) {
+                last_progress = progress;
+                progress_tracker.set(Domain::Percentage{double(progress)});
+            }
+        });
+    } catch (const CanceledException&) {
+        return std::nullopt;
+    }
+}
+
+} // namespace
+
+bool ArrangeInteractor::arrange_sequential(
+    const SelectionId project_id,
+    const std::vector<BedToArrange>& beds,
+    std::optional<std::size_t> config_container_to_add_beds,
+    const ConstModelInstanceList& extra,
+    std::function<void()> on_finished,
+    const std::string& job_name
+)
+{
+    const Project& project{m_workbench.project(project_id)};
+    const std::optional<Domain::ConfigView> config{sequential_config(project, beds)};
+    if (!config) {
+        return false;
+    }
+
+    // The plates fill the beds in the order of their index. More plates go to new beds, or beside the bed.
+    std::vector<BedToArrange> sorted_beds{beds};
+    std::ranges::sort(sorted_beds, [](const BedToArrange& a, const BedToArrange& b) { return a.index < b.index; });
+
+    std::vector<size_t> instance_ids;
+    std::map<size_t, ElementRef> instance_refs;
+    const auto add_instance{[&](const ModelInstance* instance) {
+        const size_t id{instance->id().id};
+        if (instance_refs.emplace(id, ElementRef{instance->get_object()->id().id, id, 0}).second) {
+            instance_ids.push_back(id);
+        }
+    }};
+    for (const BedToArrange& bed : sorted_beds) {
+        std::ranges::for_each(bed.arrangeable, add_instance);
+    }
+    std::ranges::for_each(extra, add_instance);
+
+    const SeqArrange seq_arrange{project.model(), *config, instance_ids};
+    ElementRefs not_arranged;
+    for (const size_t id : seq_arrange.not_arranged()) {
+        not_arranged.push_back(instance_refs.at(id));
+    }
+
+    // The size of the bed, for the plates that go beside the bed.
+    BoundingBox2d bed_box;
+    if (const Domain::BedInstance* bed_instance{project.find_bed_instance_by_id(sorted_beds.front().ref.instance_id)}) {
+        Points points;
+        for (const Vec2d& point : bed_instance->bed.get().contour()) {
+            points.push_back(scaled(point));
+        }
+        bed_box = BB::unscaled<double>(BB::construct(points));
+    }
+
+    PlatformServices::instance().job_manager()
+        .create_job(job_name, arrange_sequential_job, seq_arrange)
+        .set_project_id(project_id)
+        .on_result(
+            [this, project_id, sorted_beds, config_container_to_add_beds, on_finished, instance_refs, not_arranged,
+             bed_box](const std::optional<SeqPlates>& plates)
+            {
+                if (!plates || m_workbench.find_project_by_id(project_id) == nullptr) {
+                    if (on_finished) {
+                        on_finished();
+                    }
+                    return;
+                }
+
+                std::vector<std::pair<BedRef, Pack>> packs;
+                Packs unpacked_packs;
+                std::vector<size_t> object_order;
+                for (size_t i = 0; i < plates->size(); ++i) {
+                    Pack pack;
+                    pack.bounding_box = bed_box;
+                    for (const SeqArrange::Placement& placement : (*plates)[i]) {
+                        const ElementRef& ref{instance_refs.at(placement.instance_id)};
+                        pack.trafos.push_back(Trafo{
+                            .instance_ref    = ref,
+                            .absolute_offset = Vec2d{placement.x, placement.y},
+                            .rotation_delta  = 0.,
+                        });
+                        if (std::ranges::find(object_order, ref.object_id) == object_order.end()) {
+                            object_order.push_back(ref.object_id);
+                        }
+                    }
+                    if (i < sorted_beds.size()) {
+                        packs.emplace_back(sorted_beds[i].ref, std::move(pack));
+                    } else {
+                        unpacked_packs.push_back(std::move(pack));
+                    }
+                }
+
+                apply_local_arrange_result(project_id, packs, unpacked_packs, config_container_to_add_beds);
+                // The print order of a sequential print is the order of the objects.
+                m_scene_interactor.reorder_objects(object_order);
+
+                if (on_finished) {
+                    on_finished();
+                }
+
+                ElementRefs all_not_arranged{not_arranged};
+                if (!config_container_to_add_beds) {
+                    for (const Pack& pack : unpacked_packs) {
+                        for (const Trafo& trafo : pack.trafos) {
+                            all_not_arranged.push_back(trafo.instance_ref);
+                        }
+                    }
+                }
+                if (!all_not_arranged.empty()) {
+                    invoke_listeners<IArrangeEventsListener>(
+                        [&](auto* listener) { listener->on_elements_not_arranged(project_id, all_not_arranged); });
+                }
+            })
+        .start();
+    return true;
 }
 
 void ArrangeInteractor::arrange_added_instances(

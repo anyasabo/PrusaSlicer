@@ -1,4 +1,5 @@
 #include "ArrangeHelper.hpp"
+#include "libslic3r/SeqArrange.hpp"
 
 #include "libseqarrange/seq_interface.hpp"
 
@@ -8,9 +9,14 @@
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/Model.hpp"
+#include "Slic3r/Domain/Percentage.hpp"
 
 #include <algorithm>
+#include <map>
+#include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -40,7 +46,7 @@ struct ExtruderSlice
 // same base model can have a different toolhead or gantry (for example a tool changer), and wrong data can
 // hide a collision. Without an entry, the caller uses extruder_clearance_radius and extruder_clearance_height.
 // Returns an empty vector if there is no entry for the printer or the file cannot be read.
-std::vector<ExtruderSlice> read_gantry_slices(const Domain::Preset::HwModel& hw_model)
+std::vector<ExtruderSlice> read_gantry_slices_from_file(const Domain::Preset::HwModel& hw_model)
 {
 	namespace pt = boost::property_tree;
 	pt::ptree tree;
@@ -108,7 +114,22 @@ std::vector<ExtruderSlice> read_gantry_slices(const Domain::Preset::HwModel& hw_
 	return slices;
 }
 
-Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
+// read_gantry_slices_from_file() with a cache. One Print::process() needs the slices up to 3 times (the check, the
+// suggested order, the skirt), and each arrange needs them too. The key has the resources directory: a test can
+// change it.
+std::vector<ExtruderSlice> read_gantry_slices(const Domain::Preset::HwModel& hw_model)
+{
+	static std::mutex mutex;
+	static std::map<std::pair<std::string, std::string>, std::vector<ExtruderSlice>> cache;
+	const std::pair<std::string, std::string> key{resources_dir(), hw_model.model};
+	std::lock_guard<std::mutex> lock(mutex);
+	auto it = cache.find(key);
+	if (it == cache.end())
+		it = cache.emplace(key, read_gantry_slices_from_file(hw_model)).first;
+	return it->second;
+}
+
+Sequential::PrinterGeometry get_printer_geometry(const Domain::ConfigView& config)
 {
 	BuildVolume bv(config.get<std::vector<Vec2d>>("bed_shape"), 10.);
 	const BoundingBox& bb = bv.bounding_box();
@@ -147,47 +168,69 @@ Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
 	return out;
 }
 
-// Collects the printable instances in model order, with the projections of their convex hulls
-// above each height of the printer geometry.
-std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry, const SeqRafts& rafts)
+// The convex hull of a polygon grown by a distance (mm).
+Polygon grow_convex(const Polygon& pgn, double distance)
+{
+	if (distance <= 0. || pgn.points.empty())
+		return pgn;
+	Points grown;
+	for (const Polygon& p : Algorithms::ClipperUtils::offset(pgn, float(scaled(distance))))
+		grown.insert(grown.end(), p.points.begin(), p.points.end());
+	return Slic3r::Geometry::convex_hull(grown);
+}
+
+// The heights of the slices of the printer geometry (mm), sorted.
+std::vector<double> slice_heights(const Sequential::PrinterGeometry& printer_geometry)
 {
 	std::vector<double> heights;
 	for (const auto& [height, pgns] : printer_geometry.extruder_slices)
 		heights.push_back(unscaled(height));
 	Slic3r::sort_remove_duplicates(heights);
+	return heights;
+}
 
+// An instance with the projections of its convex hull above each height, relative to the instance offset.
+// footprint_growth (mm) grows the polygon at the bed (for example by the brim).
+Sequential::ObjectToPrint make_object_to_print(const Domain::ModelObject& mo, const Domain::ModelInstance& mi, const std::vector<double>& heights,
+                                               const SeqRaft& raft, double footprint_growth = 0.)
+{
 	namespace TriMesh = Biz::Algorithms::TriangleMesh;
 	using Biz::Algorithms::BoundingBox::sizes;
 
+	const Domain::TriangleMesh& raw_mesh = mo.raw_mesh();
+	const coord_t height = scaled(sizes(Algorithms::ModelObject::instance_bounding_box(mo, mi)).z() + raft.z_lift);
+	Sequential::ObjectToPrint otp{int(mi.id().id), false, height, {}};
+	for (double h : heights) {
+		// The bed is at zero level. The instance offset in Z is subtracted so that the hull is
+		// taken above the given height over the bed.
+		Polygon pgn;
+		if (raft.z_lift > 0. && h <= raft.z_lift) {
+			// The raft is here, and the nozzle prints it: the footprint grown by the raft expansion.
+			pgn = grow_convex(TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi.get_matrix_no_offset().cast<float>(), - mi.get_offset().z()),
+			                  raft.xy_expansion);
+		} else {
+			pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi.get_matrix_no_offset().cast<float>(), h - raft.z_lift - mi.get_offset().z());
+		}
+		if (h == 0.)
+			pgn = grow_convex(pgn, footprint_growth);
+		otp.pgns_at_height.emplace_back(scaled(h), std::move(pgn));
+	}
+	return otp;
+}
+
+// Collects the printable instances in model order, with the projections of their convex hulls
+// above each height of the printer geometry.
+std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry, const SeqRafts& rafts)
+{
+	const std::vector<double> heights = slice_heights(printer_geometry);
 	std::vector<Sequential::ObjectToPrint> objects;
 	for (const Domain::ModelObject* mo : model.objects) {
-		const Domain::TriangleMesh& raw_mesh = mo->raw_mesh();
 		for (const Domain::ModelInstance* mi : mo->instances) {
 			if (! mi->printable)
 				continue;
 			// A raft lifts the instance, and it is larger than the instance.
 			const auto raft_it = rafts.find(mi->id().id);
-			const SeqRaft raft = raft_it == rafts.end() ? SeqRaft{} : raft_it->second;
-			const coord_t height = scaled(sizes(Algorithms::ModelObject::instance_bounding_box(*mo, *mi)).z() + raft.z_lift);
-			Sequential::ObjectToPrint& otp = objects.emplace_back(Sequential::ObjectToPrint{int(mi->id().id), false, height, {}});
-			for (double h : heights) {
-				// The bed is at zero level. The instance offset in Z is subtracted so that the hull is
-				// taken above the given height over the bed.
-				Polygon pgn;
-				if (raft.z_lift > 0. && h <= raft.z_lift) {
-					// The raft is here, and the nozzle prints it: the footprint grown by the raft expansion.
-					pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi->get_matrix_no_offset().cast<float>(), - mi->get_offset().z());
-					if (raft.xy_expansion > 0. && ! pgn.points.empty()) {
-						Points grown;
-						for (const Polygon& p : Algorithms::ClipperUtils::offset(pgn, float(scaled(raft.xy_expansion))))
-							grown.insert(grown.end(), p.points.begin(), p.points.end());
-						pgn = Slic3r::Geometry::convex_hull(grown);
-					}
-				} else {
-					pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi->get_matrix_no_offset().cast<float>(), h - raft.z_lift - mi->get_offset().z());
-				}
-				otp.pgns_at_height.emplace_back(scaled(h), std::move(pgn));
-			}
+			objects.push_back(make_object_to_print(*mo, *mi, heights, raft_it == rafts.end() ? SeqRaft{} : raft_it->second));
 		}
 	}
 	return objects;
@@ -274,6 +317,130 @@ double seq_skirt_clearance(const PrintConfigView& config)
 		if (height > 0 && (lowest == 0. || unscaled(height) < lowest))
 			lowest = unscaled(height);
 	return lowest;
+}
+
+struct SeqArrange::Data
+{
+	Sequential::PrinterGeometry printer_geometry;
+	std::vector<Sequential::ObjectToPrint> objects;
+};
+
+namespace {
+
+// The brim of an object (mm): the print config, with the overrides of the object.
+double seq_object_brim(const Domain::ModelObject& mo, const Domain::ConfigView& config)
+{
+	Domain::BrimType type = config.get<Domain::BrimType>("brim_type");
+	double width = config.get<double>("brim_width");
+	if (const auto t = mo.object_settings.overrides.get("brim_type"))
+		type = t->get<Domain::BrimType>();
+	if (const auto w = mo.object_settings.overrides.get("brim_width"))
+		width = w->get<double>();
+	return type == Domain::BrimType::OuterOnly || type == Domain::BrimType::OuterAndInner ? width : 0.;
+}
+
+// The raft of the print config, before the slicing. Print::process() knows the exact lift (SeqRaft in Print.cpp). This
+// is an estimate from the layer heights. The overrides of an object are not used.
+SeqRaft seq_config_raft(const Domain::ConfigView& config)
+{
+	const int layers = config.get<int>("raft_layers");
+	if (layers <= 0)
+		return {};
+	const double first_layer = config.get<Domain::FloatOrPercentage>("first_layer_height").get_abs_value(1.0);
+	return SeqRaft{
+		.z_lift = first_layer + (layers - 1) * config.get<double>("layer_height") + config.get<double>("raft_contact_distance"),
+		.xy_expansion = config.get<double>("raft_expansion") + config.get<double>("raft_first_layer_expansion")
+	};
+}
+
+} // namespace
+
+SeqArrange::SeqArrange(const Domain::Model& model, const Domain::ConfigView& config, const std::vector<size_t>& instance_ids)
+{
+	auto data = std::make_shared<Data>();
+	data->printer_geometry = get_printer_geometry(config);
+	const std::vector<double> heights = slice_heights(data->printer_geometry);
+	const SeqRaft raft = seq_config_raft(config);
+	const BoundingBox bed = get_extents(data->printer_geometry.plate);
+	const std::set<size_t> wanted(instance_ids.begin(), instance_ids.end());
+
+	for (const Domain::ModelObject* mo : model.objects) {
+		const double brim = seq_object_brim(*mo, config);
+		const size_t first = data->objects.size();
+		for (const Domain::ModelInstance* mi : mo->instances) {
+			if (! mi->printable || ! wanted.count(mi->id().id))
+				continue;
+			Sequential::ObjectToPrint otp = make_object_to_print(*mo, *mi, heights, raft, std::max(brim, raft.xy_expansion));
+			const BoundingBox footprint = otp.pgns_at_height.empty() ? BoundingBox() : get_extents(otp.pgns_at_height.front().second);
+			if (! footprint.defined || Algorithms::BoundingBox::sizes(footprint).x() >= Algorithms::BoundingBox::sizes(bed).x() ||
+			    Algorithms::BoundingBox::sizes(footprint).y() >= Algorithms::BoundingBox::sizes(bed).y()) {
+				m_not_arranged.push_back(mi->id().id);
+				continue;
+			}
+			data->objects.push_back(std::move(otp));
+		}
+		// The instances of one object print one after the other (sort_object_instances_by_model_order() in GCode.cpp).
+		// Thus they must be on one plate, one after the other.
+		for (size_t i = first; i + 1 < data->objects.size(); ++i)
+			data->objects[i].glued_to_next = true;
+	}
+	m_data = std::move(data);
+}
+
+SeqArrange::~SeqArrange() = default;
+
+bool SeqArrange::empty() const
+{
+	return m_data->objects.empty();
+}
+
+std::vector<SeqArrange::Plate> SeqArrange::process(const std::function<void(int)>& progress) const
+{
+	if (empty())
+		return {};
+
+	// Two group sizes with a z3 resource limit. Measured with seqarrange_bench on 89 cases (2026-11-08): the
+	// better of the two results needs 15% fewer plates than group size 4 alone, in 4 s mean and 21 s for the
+	// largest case. The resource limit gives the same result on each machine. The wall-time timeout stays as a
+	// limit for a very slow machine.
+	struct Member { int group_size; int progress_from; int progress_to; };
+	const Member members[] = { {2, 0, 20}, {8, 20, 100} };
+
+	std::vector<Sequential::ScheduledPlate> best;
+	for (const Member& m : members) {
+		Sequential::SolverConfiguration solver_config(m_data->printer_geometry);
+		solver_config.set_ObjectGroupSize(m.group_size);
+		solver_config.optimization_rlimit = "2000000";
+		const auto member_progress = [&](int p) {
+			progress(m.progress_from + (m.progress_to - m.progress_from) * std::clamp(p, 0, 100) / 100);
+		};
+		std::vector<Sequential::ScheduledPlate> plates;
+		try {
+			plates = Sequential::schedule_ObjectsForSequentialPrint(solver_config, m_data->printer_geometry, m_data->objects, member_progress);
+		} catch (const std::runtime_error& e) {
+			// The solver throws if it cannot place an object. Another member can still succeed.
+			SPDLOG_WARN("Sequential arrange, group size {}: {}", m.group_size, e.what());
+			continue;
+		}
+		// The solver result must pass the geometric check (the solver had an error with this before, see the
+		// overflow fix in Rational).
+		if (Sequential::check_ScheduledObjectsForSequentialConflict(solver_config, m_data->printer_geometry, m_data->objects, plates)) {
+			SPDLOG_ERROR("Sequential arrange, group size {}: the result has a collision. It is not used.", m.group_size);
+			continue;
+		}
+		const auto first_count = [](const std::vector<Sequential::ScheduledPlate>& p) { return p.empty() ? size_t(0) : p.front().scheduled_objects.size(); };
+		if (best.empty() || plates.size() < best.size() || (plates.size() == best.size() && first_count(plates) > first_count(best)))
+			best = std::move(plates);
+	}
+	progress(100);
+
+	std::vector<Plate> out;
+	for (const Sequential::ScheduledPlate& plate : best) {
+		Plate& p = out.emplace_back();
+		for (const Sequential::ScheduledObject& o : plate.scheduled_objects)
+			p.push_back(Placement{size_t(o.id), unscaled(o.x), unscaled(o.y)});
+	}
+	return out;
 }
 
 } // namespace Slic3r

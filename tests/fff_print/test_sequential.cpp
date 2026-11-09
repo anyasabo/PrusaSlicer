@@ -364,3 +364,37 @@ TEST_CASE("Sequential print: a working print order for fixed positions", "[Seque
         CHECK(! find_seq_print_order(both_tall, view).has_value());
     }
 }
+
+TEST_CASE("Sequential print: an object above the ceiling clearance prints last", "[SequentialPrint]")
+{
+    // The CORE One firmware stops when a printed object gets above Z_CEILING_CLEARANCE (100 mm) while the bed
+    // moves up for the next object (issue #15101). geometries.json has a box over the whole bed at 99 mm.
+    struct ResourcesDirGuard
+    {
+        std::string old{resources_dir()};
+        ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+        ~ResourcesDirGuard() { set_resources_dir(old); }
+    } resources_dir_guard;
+
+    const Domain::Preset::HwModel core_one{.model = "COREONE", .base_model = "COREONE"};
+    // Far apart: 150 mm in X, 100 mm in Y. Only the ceiling box can make a conflict.
+    const std::vector<Placement> tall_first{{"tree", 50., 50., 110.}, {"small", 200., 150., 10.}};
+
+    SECTION("Printed first, the tall object is a conflict")
+    {
+        const auto conflict = check(tall_first, 1., 1., core_one);
+        REQUIRE(conflict.has_value());
+        CHECK(conflict->first == "tree");
+        CHECK(conflict->second == "small");
+    }
+
+    SECTION("Printed last, the tall object is not a conflict")
+    {
+        CHECK(! check({tall_first[1], tall_first[0]}, 1., 1., core_one).has_value());
+    }
+
+    SECTION("Two objects above the ceiling clearance have no order")
+    {
+        CHECK(check({{"tree1", 50., 50., 110.}, {"tree2", 200., 150., 110.}}, 1., 1., core_one).has_value());
+    }
+}

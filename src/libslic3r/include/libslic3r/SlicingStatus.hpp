@@ -149,7 +149,8 @@ enum class WarningCode
     XYSizeCompensationIgnoredMultiMaterialPainting,
     XYSizeCompensationIgnoredFuzzySkinPainting,
     VirtualExtruderMixesFilamentTypes,
-    SequentialCollision
+    SequentialCollision,
+    SequentialSkirtCollision
 };
 
 struct StabilityWarningPayload {
@@ -182,6 +183,12 @@ struct SequentialCollisionWarningPayload {
     std::vector<std::string> working_order;
 };
 
+// Sequential printing: the skirt prints before all objects, and it is higher than the extruder clears.
+struct SequentialSkirtWarningPayload {
+    double skirt_height{0.};   // mm
+    double clearance{0.};      // mm
+};
+
 using WarningPayload = std::variant<
     std::monostate,
     StabilityWarningPayload,
@@ -189,7 +196,8 @@ using WarningPayload = std::variant<
     CustomGCodeReservedKeywordsWarningPayload,
     InvalidToolchangeWarningPayload,
     GCodeConflictWarningPayload,
-    SequentialCollisionWarningPayload
+    SequentialCollisionWarningPayload,
+    SequentialSkirtWarningPayload
     >;
 
 enum class WarningSeverity {

@@ -1513,7 +1513,46 @@ void Print::process()
         });
     }
 
-    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config()) : std::nullopt;
+    // The rafts of the instances: a raft lifts the print, and it is larger than the object.
+    SeqRafts seq_rafts;
+    if (config().get<bool>("complete_objects")) {
+        for (const PrintObject* object : m_objects) {
+            const SlicingParameters& slicing = object->slicing_parameters();
+            if (! slicing.has_raft())
+                continue;
+            const SeqRaft raft{
+                .z_lift = slicing.object_print_z_min,
+                .xy_expansion = object->config().get<double>("raft_expansion") + object->config().get<double>("raft_first_layer_expansion")
+            };
+            for (const PrintInstance& instance : object->instances())
+                seq_rafts[instance.model_instance.id().id] = raft;
+        }
+    }
+
+    // In a sequential print, the skirt prints before all objects (a draft shield to the height of the highest
+    // object). The extruder of each object hits a skirt that is higher than the lowest part of the toolhead.
+    if (config().get<bool>("complete_objects") && this->has_skirt() && ! m_objects.empty()) {
+        double skirt_height_z = 0.;
+        for (const PrintObject* object : m_objects) {
+            if (object->layer_count() == 0)
+                continue;
+            const size_t skirt_layers = this->has_infinite_skirt() ?
+                object->layer_count() : std::min(size_t(m_config.get<int>("skirt_height")), object->layer_count());
+            skirt_height_z = std::max(skirt_height_z, object->layers()[skirt_layers - 1]->print_z);
+        }
+        const double clearance = seq_skirt_clearance(config());
+        if (clearance > 0. && skirt_height_z > clearance) {
+            this->append_warning_callback(Biz::Slicing::Warning{
+                .code = Biz::Slicing::WarningCode::SequentialSkirtCollision,
+                .item_keys = {"skirt_height", "draft_shield"},
+                .model_object_id = std::nullopt,
+                .payload = Biz::Slicing::SequentialSkirtWarningPayload{.skirt_height = skirt_height_z, .clearance = clearance},
+                .severity = Biz::Slicing::WarningSeverity::HIGH
+            });
+        }
+    }
+
+    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config(), seq_rafts) : std::nullopt;
     if (m_sequential_collision_detected) {
         this->append_warning_callback(Biz::Slicing::Warning{
             .code = Biz::Slicing::WarningCode::SequentialCollision,
@@ -1522,7 +1561,7 @@ void Print::process()
             .payload = Biz::Slicing::SequentialCollisionWarningPayload{
                 .object_hit = m_sequential_collision_detected->first,
                 .object_printed = m_sequential_collision_detected->second,
-                .working_order = find_seq_print_order(model(), config()).value_or(std::vector<std::string>{})
+                .working_order = find_seq_print_order(model(), config(), seq_rafts).value_or(std::vector<std::string>{})
             },
             .severity = Biz::Slicing::WarningSeverity::HIGH
         });

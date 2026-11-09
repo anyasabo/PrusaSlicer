@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -396,5 +397,131 @@ TEST_CASE("Sequential print: an object above the ceiling clearance prints last",
     SECTION("Two objects above the ceiling clearance have no order")
     {
         CHECK(check({{"tree1", 50., 50., 110.}, {"tree2", 200., 150., 110.}}, 1., 1., core_one).has_value());
+    }
+}
+
+namespace {
+
+// Processes the boxes with complete_objects and returns the warnings of Print::process().
+std::vector<Biz::Slicing::Warning> process_sequential(const std::vector<Placement>& placements,
+                                                      const std::function<void(TestConfig&)>& tweak)
+{
+    TestConfig config;
+    config.print.items.opt("complete_objects").set(true);
+    config.print.items.opt("layer_height").set(0.2);
+    config.print.items.opt("first_layer_height").set(Domain::FloatOrPercentage{0.2});
+    config.print.items.opt("skirts").set(0);
+    config.printer.items.opt("extruder_clearance_radius").set(20.);
+    config.printer.items.opt("extruder_clearance_height").set(20.);
+    tweak(config);
+
+    Domain::Model model;
+    add_boxes(model, placements);
+    Print print;
+    std::vector<Biz::Slicing::Warning> warnings;
+    print.append_warning_callback = [&warnings](Biz::Slicing::Warning w) { warnings.push_back(std::move(w)); };
+    Domain::Preset::SelectedPresetMetadata preset_metadata = create_dummy_selected_preset_metadata(config.hw_config);
+    auto gcode_metadata = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
+    Domain::Bed model_bed;
+    Domain::BedInstance bed_instance{model_bed};
+    for (const Domain::ModelObject* object : model.objects)
+        for (Domain::ModelInstance* instance : object->instances)
+            bed_instance.model_instances.push_back(instance);
+    print.update(model, config, bed_instance, preset_metadata,
+                 Biz::Slicing::build_metadata_serializer(gcode_metadata, preset_metadata, config));
+    print.validate();
+    print.process();
+    return warnings;
+}
+
+bool has_warning(const std::vector<Biz::Slicing::Warning>& warnings, Biz::Slicing::WarningCode code)
+{
+    return std::any_of(warnings.begin(), warnings.end(), [code](const auto& w) { return w.code == code; });
+}
+
+} // namespace
+
+TEST_CASE("Sequential print: a raft lifts the object", "[SequentialPrint]")
+{
+    // Clearance fallback (radius 20, height 20). The tall box (19.5 mm) is just below the gantry. The low box is
+    // 100 mm away in X and 25 mm in Y: only the gantry band can reach the tall box.
+    const std::vector<Placement> placements{{"tall", 60., 115., 19.5}, {"low", 160., 140., 5.}};
+
+    SECTION("In the check: a lift of 0.95 mm puts the tall box into the gantry")
+    {
+        TestConfig config;
+        config.print.items.opt("complete_objects").set(true);
+        config.printer.items.opt("extruder_clearance_radius").set(20.);
+        config.printer.items.opt("extruder_clearance_height").set(20.);
+        const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+        Domain::Model model;
+        add_boxes(model, placements);
+        CHECK(! check_seq_conflict(model, view).has_value());
+
+        SeqRafts rafts;
+        for (const Domain::ModelObject* mo : model.objects)
+            rafts[mo->instances.front()->id().id] = SeqRaft{.z_lift = 0.95, .xy_expansion = 4.5};
+        const auto conflict = check_seq_conflict(model, view, rafts);
+        REQUIRE(conflict.has_value());
+        CHECK(conflict->first == "tall");
+    }
+
+    SECTION("Through Print: raft_layers = 3 gives the collision warning")
+    {
+        CHECK(! has_warning(process_sequential(placements, [](TestConfig&) {}), Biz::Slicing::WarningCode::SequentialCollision));
+        CHECK(has_warning(process_sequential(placements, [](TestConfig& c) { c.print.items.opt("raft_layers").set(3); }),
+                          Biz::Slicing::WarningCode::SequentialCollision));
+    }
+}
+
+TEST_CASE("Sequential print: a high skirt is hit", "[SequentialPrint]")
+{
+    // The skirt prints before all objects. With the clearance fallback, the toolhead box starts 1 mm above the tip.
+    const std::vector<Placement> placements{{"a", 60., 100., 10.}, {"b", 160., 100., 10.}};
+    using Biz::Slicing::WarningCode;
+
+    SECTION("The clearance of the fallback is 1 mm, of the CORE One 2 mm")
+    {
+        TestConfig config;
+        const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+        CHECK(seq_skirt_clearance(view) == Approx(1.));
+
+        struct ResourcesDirGuard
+        {
+            std::string old{resources_dir()};
+            ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+            ~ResourcesDirGuard() { set_resources_dir(old); }
+        } resources_dir_guard;
+        TestConfig core_one;
+        core_one.hw_config.model = Domain::Preset::HwModel{.model = "COREONE", .base_model = "COREONE"};
+        const PrintConfigView core_one_view{std::make_shared<const Domain::FullConfigFDM>(core_one.get_full_config())};
+        CHECK(seq_skirt_clearance(core_one_view) == Approx(2.));
+    }
+
+    SECTION("A skirt of one layer is not hit")
+    {
+        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+            c.print.items.opt("skirts").set(1);
+            c.print.items.opt("skirt_height").set(1);
+        });
+        CHECK(! has_warning(warnings, WarningCode::SequentialSkirtCollision));
+    }
+
+    SECTION("A skirt of 10 layers (2 mm) is hit")
+    {
+        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+            c.print.items.opt("skirts").set(1);
+            c.print.items.opt("skirt_height").set(10);
+        });
+        CHECK(has_warning(warnings, WarningCode::SequentialSkirtCollision));
+    }
+
+    SECTION("A draft shield is hit")
+    {
+        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+            c.print.items.opt("skirts").set(1);
+            c.print.items.opt("draft_shield").set(Domain::DraftShield::dsEnabled);
+        });
+        CHECK(has_warning(warnings, WarningCode::SequentialSkirtCollision));
     }
 }

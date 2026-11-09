@@ -4,6 +4,7 @@
 
 #include "libslic3r/BuildVolume.hpp"
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
+#include "Slic3r/Biz/Algorithms/ClipperUtils.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Directories.hpp"
@@ -145,7 +146,7 @@ Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
 
 // Collects the printable instances in model order, with the projections of their convex hulls
 // above each height of the printer geometry.
-std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry)
+std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry, const SeqRafts& rafts)
 {
 	std::vector<double> heights;
 	for (const auto& [height, pgns] : printer_geometry.extruder_slices)
@@ -161,12 +162,27 @@ std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model&
 		for (const Domain::ModelInstance* mi : mo->instances) {
 			if (! mi->printable)
 				continue;
-			const coord_t height = scaled(sizes(Algorithms::ModelObject::instance_bounding_box(*mo, *mi)).z());
+			// A raft lifts the instance, and it is larger than the instance.
+			const auto raft_it = rafts.find(mi->id().id);
+			const SeqRaft raft = raft_it == rafts.end() ? SeqRaft{} : raft_it->second;
+			const coord_t height = scaled(sizes(Algorithms::ModelObject::instance_bounding_box(*mo, *mi)).z() + raft.z_lift);
 			Sequential::ObjectToPrint& otp = objects.emplace_back(Sequential::ObjectToPrint{int(mi->id().id), false, height, {}});
 			for (double h : heights) {
 				// The bed is at zero level. The instance offset in Z is subtracted so that the hull is
 				// taken above the given height over the bed.
-				Polygon pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi->get_matrix_no_offset().cast<float>(), h - mi->get_offset().z());
+				Polygon pgn;
+				if (raft.z_lift > 0. && h <= raft.z_lift) {
+					// The raft is here, and the nozzle prints it: the footprint grown by the raft expansion.
+					pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi->get_matrix_no_offset().cast<float>(), - mi->get_offset().z());
+					if (raft.xy_expansion > 0. && ! pgn.points.empty()) {
+						Points grown;
+						for (const Polygon& p : Algorithms::ClipperUtils::offset(pgn, float(scaled(raft.xy_expansion))))
+							grown.insert(grown.end(), p.points.begin(), p.points.end());
+						pgn = Slic3r::Geometry::convex_hull(grown);
+					}
+				} else {
+					pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi->get_matrix_no_offset().cast<float>(), h - raft.z_lift - mi->get_offset().z());
+				}
 				otp.pgns_at_height.emplace_back(scaled(h), std::move(pgn));
 			}
 		}
@@ -187,13 +203,13 @@ Sequential::ScheduledPlate get_plate(const Domain::Model& model)
 
 } // namespace
 
-std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config)
+std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts)
 {
 	Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
 	if (printer_geometry.extruder_slices.empty())
 		return std::nullopt;
 	Sequential::SolverConfiguration solver_config(printer_geometry);
-	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry);
+	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts);
 	const std::optional<std::vector<int>> order =
 		Sequential::find_ObjectOrderForSequentialPrint(solver_config, printer_geometry, objects, get_plate(model));
 	if (! order)
@@ -208,14 +224,14 @@ std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model
 	return names;
 }
 
-std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Domain::Model& model, const PrintConfigView& config)
+std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts)
 {
 	Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
 	if (printer_geometry.extruder_slices.empty())
 		return std::nullopt;
 
 	Sequential::SolverConfiguration solver_config(printer_geometry);
-	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry);
+	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts);
 	if (objects.size() < 2)
 		return std::nullopt;
 
@@ -236,6 +252,16 @@ std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Doma
 				names.second = mo->name;
 		}
 	return names;
+}
+
+double seq_skirt_clearance(const PrintConfigView& config)
+{
+	const Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
+	double lowest = 0.;
+	for (const auto& [height, polygons] : printer_geometry.extruder_slices)
+		if (height > 0 && (lowest == 0. || unscaled(height) < lowest))
+			lowest = unscaled(height);
+	return lowest;
 }
 
 } // namespace Slic3r

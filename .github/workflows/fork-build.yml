@@ -1,0 +1,136 @@
+# Builds the fork anyasabo/PrusaSlicer (branch anya/main) for macOS arm64 and Linux x86_64.
+#
+# The steps are the ones of a local build: .github/fork/build.sh runs doc/Build.md, and package-*.sh makes the
+# packages. This file adds only the system packages of doc/Build.md, the caches and the upload.
+# - A push to anya/main: the packages are workflow artifacts.
+# - A tag v<version>-anya.<n>: the packages also go to the GitHub release of the tag (upload-release.sh).
+#
+# Caches:
+# - deps: the dependency prefix (deps/build/destdir). The key has the hash of deps/ and the OS and SDK version. A hit
+#   skips doc/Build.md step 1 (more than one hour). It is saved right after the deps build, also if the app fails.
+# - ccache: the compiler cache of the app. A new entry each run, restored from the last one.
+#
+# The upstream workflows (build_osx.yml and others) call private Prusa workflows. They are disabled in the fork
+# settings (gh workflow disable), so they do not run on the fork.
+name: Fork build
+
+on:
+  push:
+    branches: [anya/main]
+    tags: ['v*-anya.*']
+  workflow_dispatch:
+
+concurrency:
+  group: fork-build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_COMPRESS: 'true'
+  CCACHE_MAXSIZE: 3G
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-latest
+            package: .github/fork/package-macos.sh
+          - name: linux-x64
+            runner: ubuntu-24.04
+            package: .github/fork/package-linux.sh
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # build.sh reads the tag for the version suffix
+
+      # doc/Build.md, "0. Prerequisites", and ccache.
+      - name: System packages (macOS)
+        if: runner.os == 'macOS'
+        run: brew install automake cmake git gettext libtool texinfo ccache
+      - name: System packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential autoconf cmake libtool libglu1-mesa-dev libgtk-3-dev \
+            libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache
+
+      - name: Cache keys
+        id: keys
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            os="macos-$(sw_vers -productVersion)-sdk$(xcrun --show-sdk-version)"
+          else
+            os="$(. /etc/os-release && echo "$ID-$VERSION_ID")-gcc$(gcc -dumpfullversion)"
+          fi
+          echo "deps=deps-$RUNNER_OS-$RUNNER_ARCH-$os-${{ hashFiles('deps/**', 'cmake/modules/**') }}" >> "$GITHUB_OUTPUT"
+          echo "ccache=ccache-$RUNNER_OS-$RUNNER_ARCH-$os" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the dependencies
+        id: deps
+        uses: actions/cache/restore@v6
+        with:
+          path: deps/build/destdir
+          key: ${{ steps.keys.outputs.deps }}
+
+      - name: Build the dependencies (doc/Build.md step 1)
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: .github/fork/build.sh deps
+
+      - name: Save the dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: deps/build/destdir
+          key: ${{ steps.keys.outputs.deps }}
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ${{ steps.keys.outputs.ccache }}-${{ github.run_id }}
+          restore-keys: ${{ steps.keys.outputs.ccache }}-
+
+      - name: Build PrusaSlicer (doc/Build.md step 2)
+        run: |
+          ccache --zero-stats
+          .github/fork/build.sh app
+          ccache --show-stats
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ${{ steps.keys.outputs.ccache }}-${{ github.run_id }}
+
+      - name: Package
+        run: ${{ matrix.package }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: PrusaSlicer-${{ matrix.name }}
+          path: build/package/*
+          if-no-files-found: error
+
+      - name: Upload to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: .github/fork/upload-release.sh "${GITHUB_REF_NAME}"

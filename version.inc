@@ -4,6 +4,12 @@
 set(SLIC3R_APP_NAME "PrusaSlicer")
 set(SLIC3R_APP_KEY "PrusaSlicer")
 set(SLIC3R_VERSION "3.0.0-alpha14")
-set(SLIC3R_BUILD_ID "PrusaSlicer-${SLIC3R_VERSION}+UNKNOWN")
+# The fork anyasabo/PrusaSlicer, branch anya/main: the build ID shows that this is not an upstream build.
+# The build scripts in .github/fork set the suffix from the git tag (for example -DSLIC3R_FORK_SUFFIX=anya.1).
+# SLIC3R_VERSION stays as upstream: the preset updater compares it with the profile versions.
+if (NOT SLIC3R_FORK_SUFFIX)
+    set(SLIC3R_FORK_SUFFIX "anya")
+endif ()
+set(SLIC3R_BUILD_ID "PrusaSlicer-${SLIC3R_VERSION}+${SLIC3R_FORK_SUFFIX}")
 set(SLIC3R_RC_VERSION "3,0,0,0")
 set(SLIC3R_RC_VERSION_DOTS "3.0.0.0")

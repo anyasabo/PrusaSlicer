@@ -170,3 +170,85 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: .github/fork/upload-release.sh "${GITHUB_REF_NAME}"
+
+  # A second compiler as a check: GCC 16.2 (Ubuntu 26.10 has it, the 26.04 runner has only a snapshot). Different
+  # compilers find different problems (warnings, undefined behaviour). It only compiles: no LTO (CMakeLists.txt turns
+  # LTO on for Release only), no debug info, no package, no release. Not on tags.
+  gcc-check:
+    if: github.ref_type != 'tag'
+    name: linux-gcc16-check
+    runs-on: ubuntu-26.04
+    container: ubuntu:26.10
+    timeout-minutes: 360
+    env:
+      CC: gcc-16
+      CXX: g++-16
+      CMAKE_ARGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2
+    steps:
+      # doc/Build.md, "0. Prerequisites" (Ubuntu), gcc-16, ccache. git before the checkout, for the tags.
+      - name: System packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git build-essential autoconf cmake libtool libglu1-mesa-dev \
+            libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache gcc-16 g++-16 curl ca-certificates
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Cache keys
+        id: keys
+        run: |
+          os="$(. /etc/os-release && echo "$ID-$VERSION_ID")"
+          cxx=$("$CXX" --version | head -1 | sed 's/[^A-Za-z0-9.]\+/-/g')
+          echo "deps=deps-check-$os-$cxx-${{ hashFiles('deps/**', 'cmake/modules/**') }}" >> "$GITHUB_OUTPUT"
+          echo "ccache=ccache-check-$os-$cxx" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the dependencies
+        id: deps
+        uses: actions/cache/restore@v6
+        with:
+          path: deps/build/destdir
+          key: ${{ steps.keys.outputs.deps }}
+
+      - name: Build the dependencies (doc/Build.md step 1)
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: .github/fork/build.sh deps
+
+      - name: Save the dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: deps/build/destdir
+          key: ${{ steps.keys.outputs.deps }}
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ${{ steps.keys.outputs.ccache }}-${{ github.run_id }}
+          restore-keys: ${{ steps.keys.outputs.ccache }}-
+
+      - name: Compile PrusaSlicer with GCC 16
+        shell: bash  # -eo pipefail: a failed build must fail the step, also with tee
+        run: |
+          ccache --zero-stats
+          .github/fork/build.sh app 2>&1 | tee build-gcc16.log
+          ccache --show-stats
+          echo "warnings: $(grep -c 'warning:' build-gcc16.log)"
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ${{ steps.keys.outputs.ccache }}-${{ github.run_id }}
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-log-gcc16
+          path: build-gcc16.log

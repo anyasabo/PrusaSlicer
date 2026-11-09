@@ -7,6 +7,8 @@
 #include <ostream>
 #include <variant>
 #include <map>
+#include <string>
+#include <vector>
 
 
 namespace Slic3r::Biz::Slicing {
@@ -146,7 +148,9 @@ enum class WarningCode
     GCodeConflict,
     XYSizeCompensationIgnoredMultiMaterialPainting,
     XYSizeCompensationIgnoredFuzzySkinPainting,
-    VirtualExtruderMixesFilamentTypes
+    VirtualExtruderMixesFilamentTypes,
+    SequentialCollision,
+    SequentialSkirtCollision
 };
 
 struct StabilityWarningPayload {
@@ -171,13 +175,29 @@ struct GCodeConflictWarningPayload {
     double height{0.};
 };
 
+// Sequential printing: the extruder or gantry hits object_hit while it prints object_printed.
+struct SequentialCollisionWarningPayload {
+    std::string object_hit;
+    std::string object_printed;
+    // A print order that has no collision, as names. Empty if no order works.
+    std::vector<std::string> working_order;
+};
+
+// Sequential printing: the skirt prints before all objects, and it is higher than the extruder clears.
+struct SequentialSkirtWarningPayload {
+    double skirt_height{0.};   // mm
+    double clearance{0.};      // mm
+};
+
 using WarningPayload = std::variant<
     std::monostate,
     StabilityWarningPayload,
     EmptyLayersWarningPayload,
     CustomGCodeReservedKeywordsWarningPayload,
     InvalidToolchangeWarningPayload,
-    GCodeConflictWarningPayload
+    GCodeConflictWarningPayload,
+    SequentialCollisionWarningPayload,
+    SequentialSkirtWarningPayload
     >;
 
 enum class WarningSeverity {

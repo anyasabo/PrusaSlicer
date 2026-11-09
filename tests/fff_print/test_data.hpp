@@ -249,7 +249,7 @@ inline double arrange_min_distance(const TestConfig& config)
     if (config.get_view().get<Domain::PrinterTechnology>("printer_technology") == Domain::PrinterTechnology::FFF) {
         out = 0.;
         bool has_all = std::ranges::all_of(std::vector<std::string>{"extruder_clearance_radius", "duplicate_distance", "complete_objects"},
-            [&config](const auto& s) { return bool(config.contains("s", 0).item); });
+            [&config](const auto& s) { return bool(config.contains(s, 0).item); });
         if (has_all) {
             auto ecr = config.get_view().get<double>("extruder_clearance_radius");
             auto dd  = config.get_view().get<double>("duplicate_distance");

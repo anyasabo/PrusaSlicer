@@ -907,18 +907,36 @@ static inline std::vector<const PrintInstance*> sort_object_instances_by_max_z(c
 #endif
 
 // Produce a vector of PrintObjects in the order of their respective ModelObjects in print.model().
+// Sequential print order: the model objects in their order, and the instances of each object in their order.
+// PrintInstance::model_instance_index is the index inside its ModelObject only, so it cannot give this order alone.
 std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Print& print)
 {
-    std::vector<const PrintInstance*> instances;
-    for (const PrintObject *print_object : print.objects()) {
-        for (const PrintInstance &print_instance : print_object->instances()) {
-            instances.emplace_back(&print_instance);
-        }
-    }
-    std::sort(instances.begin(), instances.end(), [](const PrintInstance* a, const PrintInstance* b) {
-        return a->model_instance_index < b->model_instance_index;
-    });
+    // PrintInstance::model_instance is a copy of the ModelInstance. The copy has the same ObjectID, but not the
+    // same address. Thus match the instances of print.model() by their ids.
+    std::vector<std::pair<size_t, const PrintInstance*>> id_to_print;
+    for (const PrintObject *print_object : print.objects())
+        for (const PrintInstance &print_instance : print_object->instances())
+            id_to_print.emplace_back(print_instance.model_instance.id().id, &print_instance);
+    const auto by_id = [](const auto &l, const auto &r) { return l.first < r.first; };
+    std::stable_sort(id_to_print.begin(), id_to_print.end(), by_id);
 
+    std::vector<const PrintInstance*> instances;
+    instances.reserve(id_to_print.size());
+    std::vector<bool> used(id_to_print.size(), false);
+    for (const Domain::ModelObject *model_object : print.model().objects)
+        for (const Domain::ModelInstance *model_instance : model_object->instances) {
+            const size_t id = model_instance->id().id;
+            auto it = std::lower_bound(id_to_print.begin(), id_to_print.end(), std::make_pair(id, nullptr), by_id);
+            if (it != id_to_print.end() && it->first == id && ! used[it - id_to_print.begin()]) {
+                instances.emplace_back(it->second);
+                used[it - id_to_print.begin()] = true;
+            }
+        }
+    // Do not drop a print instance that is not found in the model. Keep the order of print.objects() for them.
+    for (const PrintObject *print_object : print.objects())
+        for (const PrintInstance &print_instance : print_object->instances())
+            if (std::find(instances.begin(), instances.end(), &print_instance) == instances.end())
+                instances.emplace_back(&print_instance);
     return instances;
 }
 

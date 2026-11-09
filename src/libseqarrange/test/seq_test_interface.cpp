@@ -13,6 +13,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 
+#include <tuple>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -1250,3 +1251,224 @@ TEST_CASE("Interface test 6", "[Sequential Arrangement Interface]")
 /*----------------------------------------------------------------*/
 
 
+
+
+TEST_CASE("Interface test: print order for fixed positions", "[Sequential Arrangement Interface]")
+{
+    // A toolhead that reaches 40 mm to one side in Y above 2 mm, and a 10 x 10 mm nozzle block below.
+    PrinterGeometry printer_geometry =
+	{
+	    { {0, 0}, {250000000, 0}, {250000000, 210000000}, {0, 210000000} },
+	    { 0, 2000000 },
+	    { },
+	    {
+		{0, { { {-5000000, -5000000}, {5000000, -5000000}, {5000000, 5000000}, {-5000000, 5000000} } } },
+		{2000000, { { {-5000000, -40000000}, {5000000, -40000000}, {5000000, 5000000}, {-5000000, 5000000} } } }
+	    }
+	};
+    SolverConfiguration solver_configuration(printer_geometry);
+
+    // 20 x 20 x 10 mm boxes.
+    auto box = [](int id) {
+	ObjectToPrint o;
+	o.id = id;
+	o.total_height = 10000000;
+	const Polygon square{ {-10000000, -10000000}, {10000000, -10000000}, {10000000, 10000000}, {-10000000, 10000000} };
+	o.pgns_at_height = { {0, square}, {2000000, square} };
+	return o;
+    };
+    std::vector<ObjectToPrint> objects{box(1), box(2), box(3), box(4)};
+
+    auto plate_of = [](std::vector<std::tuple<int, coord_t, coord_t>> items) {
+	ScheduledPlate plate;
+	for (auto [id, x, y] : items)
+	    plate.scheduled_objects.emplace_back(id, x * 1000000, y * 1000000);
+	return plate;
+    };
+    auto check = [&](const ScheduledPlate &plate) {
+	return check_ScheduledObjectsForSequentialConflict(solver_configuration, printer_geometry, objects, std::vector<ScheduledPlate>{plate});
+    };
+    auto reorder = [&](const ScheduledPlate &plate, const std::vector<int> &order) {
+	ScheduledPlate out;
+	for (int id : order)
+	    for (const ScheduledObject &o : plate.scheduled_objects)
+		if (o.id == id)
+		    out.scheduled_objects.push_back(o);
+	return out;
+    };
+
+    SECTION("Two objects 35 mm apart in Y work in one order only")
+    {
+	const ScheduledPlate ab = plate_of({{1, 100, 80}, {2, 100, 115}});
+	const ScheduledPlate ba = plate_of({{2, 100, 115}, {1, 100, 80}});
+	REQUIRE(check(ab).has_value() != check(ba).has_value());
+
+	for (const ScheduledPlate *given : {&ab, &ba})
+	{
+	    const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, *given);
+	    REQUIRE(order.has_value());
+	    REQUIRE(order->size() == 2);
+	    CHECK(! check(reorder(*given, *order)).has_value());
+	}
+    }
+
+    SECTION("Objects far apart keep the given order")
+    {
+	const ScheduledPlate plate = plate_of({{3, 200, 50}, {1, 40, 50}, {2, 120, 150}});
+	const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, plate);
+	REQUIRE(order.has_value());
+	CHECK(*order == std::vector<int>{3, 1, 2});
+    }
+
+    SECTION("Objects that hit each other in both orders have no order")
+    {
+	// 2 mm apart in X: the 10 x 10 mm nozzle block of each one reaches the other.
+	const ScheduledPlate plate = plate_of({{1, 100, 100}, {2, 122, 100}});
+	std::pair<int, int> blocking{0, 0};
+	const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, plate, &blocking);
+	CHECK(! order.has_value());
+	CHECK(((blocking.first == 1 && blocking.second == 2) || (blocking.first == 2 && blocking.second == 1)));
+    }
+
+    SECTION("A row in Y prints in the one order that works, and an object far away keeps its place")
+    {
+	// Objects 1, 2, 3 in a row, 35 mm apart in Y, given in the wrong order. Object 4 is far away in X.
+	const ScheduledPlate given = plate_of({{4, 220, 100}, {2, 60, 105}, {1, 60, 70}, {3, 60, 140}});
+	const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given);
+	REQUIRE(order.has_value());
+	// The slice polygons are turned 180 degrees: the polygon to -Y 40 mm is a toolhead that reaches 40 mm to +Y.
+	// Thus an earlier object must not be at +Y of a later one, and the row prints from -Y to +Y. Object 4 is free
+	// and first in the given order.
+	CHECK(*order == std::vector<int>{4, 1, 2, 3});
+	CHECK(! check(reorder(given, *order)).has_value());
+    }
+
+    SECTION("Groups print as one, in their given order")
+    {
+	// Objects 1 and 2 are one group (instances of one object), object 3 is another. 2 is at +Y of 3, so 3 must
+	// print before 2.
+	const ScheduledPlate given = plate_of({{1, 220, 100}, {2, 60, 105}, {3, 60, 70}});
+	const auto per_object = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given);
+	REQUIRE(per_object.has_value());
+	CHECK(*per_object == std::vector<int>{1, 3, 2});
+	const auto grouped = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, nullptr, {0, 0, 1});
+	REQUIRE(grouped.has_value());
+	CHECK(*grouped == std::vector<int>{3, 1, 2});
+	CHECK(! check(reorder(given, *grouped)).has_value());
+    }
+
+    SECTION("A group whose given order does not work has no order")
+    {
+	// 3 must print before 2 (2 is at +Y of 3), so the group (2, 3) in this order fails.
+	const ScheduledPlate given = plate_of({{2, 60, 105}, {3, 60, 70}});
+	std::pair<int, int> blocking{0, 0};
+	CHECK(! find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, &blocking, {7, 7}).has_value());
+	CHECK(blocking == std::pair<int, int>{2, 3});
+    }
+
+    SECTION("Two groups that block each other report two objects")
+    {
+	// Objects 1, 2, 3 in a row in Y (the row must print 1, 2, 3). Groups {1, 3} and {2}: 1 must print before 2,
+	// and 2 before 3, so neither group can print first.
+	const ScheduledPlate given = plate_of({{1, 60, 70}, {2, 60, 105}, {3, 60, 140}});
+	std::pair<int, int> blocking{0, 0};
+	CHECK(! find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, &blocking, {0, 1, 0}).has_value());
+	CHECK(blocking.first != 0);
+	CHECK(blocking.second != 0);
+    }
+}
+
+
+TEST_CASE("Interface test: greedy arrange", "[Sequential Arrangement Interface]")
+{
+    // The toolhead of the test above: a 10 x 10 mm nozzle block, and 40 mm to one side in Y above 2 mm. A gantry box
+    // over the full width at 20 mm.
+    PrinterGeometry printer_geometry =
+	{
+	    { {0, 0}, {250000000, 0}, {250000000, 210000000}, {0, 210000000} },
+	    { 0, 2000000 },
+	    { 20000000 },
+	    {
+		{0, { { {-5000000, -5000000}, {5000000, -5000000}, {5000000, 5000000}, {-5000000, 5000000} } } },
+		{2000000, { { {-5000000, -40000000}, {5000000, -40000000}, {5000000, 5000000}, {-5000000, 5000000} } } },
+		{20000000, { { {-300000000, -30000000}, {300000000, -30000000}, {300000000, -10000000}, {-300000000, -10000000} } } }
+	    }
+	};
+    SolverConfiguration solver_configuration(printer_geometry);
+
+    // Boxes of side mm and height mm.
+    auto box = [](int id, int side, int height) {
+	ObjectToPrint o;
+	o.id = id;
+	o.total_height = height * 1000000;
+	const coord_t h = side * 500000;
+	const Polygon square{ {-h, -h}, {h, -h}, {h, h}, {-h, h} };
+	for (coord_t z : {0, 2000000, 20000000})
+	    o.pgns_at_height.emplace_back(z, z < o.total_height ? square : Polygon());
+	return o;
+    };
+    auto ids = [](const std::vector<ScheduledPlate> &plates) {
+	std::vector<int> out;
+	for (const ScheduledPlate &p : plates)
+	    for (const ScheduledObject &o : p.scheduled_objects)
+		out.push_back(o.id);
+	std::sort(out.begin(), out.end());
+	return out;
+    };
+
+    SECTION("Each object is placed once, inside the bed, without a collision")
+    {
+	std::vector<ObjectToPrint> objects;
+	for (int i = 1; i <= 30; ++i)
+	    objects.push_back(box(i, 15 + (i * 7) % 30, i % 3 == 0 ? 40 : 10));
+	const std::vector<ScheduledPlate> plates = schedule_ObjectsForSequentialPrintGreedy(solver_configuration, printer_geometry, objects);
+	REQUIRE(! plates.empty());
+	std::vector<int> expected;
+	for (const ObjectToPrint &o : objects)
+	    expected.push_back(o.id);
+	CHECK(ids(plates) == expected);
+	CHECK(! check_ScheduledObjectsForSequentialConflict(solver_configuration, printer_geometry, objects, plates));
+	for (const ScheduledPlate &p : plates)
+	    for (const ScheduledObject &so : p.scheduled_objects) {
+		const ObjectToPrint &o = *std::find_if(objects.begin(), objects.end(), [&so](const ObjectToPrint &x) { return x.id == so.id; });
+		const BoundingBox bb = get_extents(o.pgns_at_height.front().second);
+		CHECK(so.x + bb.min.x() >= 0);
+		CHECK(so.y + bb.min.y() >= 0);
+		CHECK(so.x + bb.max.x() <= 250000000);
+		CHECK(so.y + bb.max.y() <= 210000000);
+	    }
+    }
+
+    SECTION("Glued objects stay together and in order")
+    {
+	std::vector<ObjectToPrint> objects{box(1, 30, 10), box(2, 20, 10), box(3, 20, 10), box(4, 20, 10), box(5, 30, 10)};
+	objects[1].glued_to_next = true;
+	objects[2].glued_to_next = true;
+	const std::vector<ScheduledPlate> plates = schedule_ObjectsForSequentialPrintGreedy(solver_configuration, printer_geometry, objects);
+	bool together = false;
+	for (const ScheduledPlate &p : plates)
+	    for (size_t i = 0; i + 2 < p.scheduled_objects.size(); ++i)
+		together |= p.scheduled_objects[i].id == 2 && p.scheduled_objects[i + 1].id == 3 && p.scheduled_objects[i + 2].id == 4;
+	CHECK(together);
+	CHECK(! check_ScheduledObjectsForSequentialConflict(solver_configuration, printer_geometry, objects, plates));
+    }
+
+    SECTION("A glued unit larger than a plate throws, or is split")
+    {
+	std::vector<ObjectToPrint> objects;
+	for (int i = 1; i <= 40; ++i) {
+	    objects.push_back(box(i, 40, 10));
+	    objects.back().glued_to_next = i < 40;
+	}
+	CHECK_THROWS_AS(schedule_ObjectsForSequentialPrintGreedy(solver_configuration, printer_geometry, objects), std::runtime_error);
+	const std::vector<ScheduledPlate> plates = schedule_ObjectsForSequentialPrintGreedy(solver_configuration, printer_geometry, objects, true);
+	CHECK(plates.size() > 1);
+	CHECK(ids(plates).size() == 40);
+    }
+
+    SECTION("An object larger than the bed throws")
+    {
+	std::vector<ObjectToPrint> objects{box(1, 300, 10)};
+	CHECK_THROWS_AS(schedule_ObjectsForSequentialPrintGreedy(solver_configuration, printer_geometry, objects, true), std::runtime_error);
+    }
+}

@@ -6,6 +6,7 @@
 #include "Slic3r/Biz/IArrangeEventsListener.hpp"
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
+#include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/TestUtils/AppInstanceMessageHandlerScope.hpp"
 #include "Slic3r/TestUtils/TestData.hpp"
@@ -341,4 +342,52 @@ TEST_CASE_METHOD(
         !selected_a->get_offset().isApprox(selected_a_offset_before)
         || !selected_b->get_offset().isApprox(selected_b_offset_before)};
     CHECK((selected_not_arranged_count > 0 || at_least_one_selected_moved));
+}
+
+struct ObjectsReorderedListener : Biz::Scene::ISceneChangedListener
+{
+    void on_objects_reordered(Domain::SelectionId project) override
+    {
+        (void)project;
+        ++count;
+    }
+
+    int count{0};
+};
+
+TEST_CASE_METHOD(
+    ArrangeInteractorFixture,
+    "Reorders model objects: the listed objects change places, the others stay",
+    "[ArrangeInteractor]")
+{
+    const Domain::ModelInstance* a{add_cube(0.1)};
+    const Domain::ModelInstance* b{add_cube(0.1)};
+    const Domain::ModelInstance* c{add_cube(0.1)};
+    const auto id = [](const Domain::ModelInstance* instance) { return instance->get_object()->id().id; };
+    const auto order = [this]() {
+        std::vector<size_t> ids;
+        for (const Domain::ModelObject* object : project->model().objects) {
+            ids.push_back(object->id().id);
+        }
+        return ids;
+    };
+    REQUIRE(order() == std::vector<size_t>{id(initial_instance), id(a), id(b), id(c)});
+
+    ObjectsReorderedListener listener;
+    scene_interactor.add_listener<Biz::Scene::ISceneChangedListener>(&listener);
+
+    // c and a take the places of a and c. The initial object and b keep their places.
+    CHECK(scene_interactor.reorder_objects({id(c), id(a)}));
+    CHECK(order() == std::vector<size_t>{id(initial_instance), id(c), id(b), id(a)});
+    CHECK(listener.count == 1);
+
+    // The same order again changes nothing. An unknown id is ignored.
+    CHECK_FALSE(scene_interactor.reorder_objects({id(c), 999999, id(a)}));
+    CHECK(listener.count == 1);
+
+    // The object list of the bed follows the model order.
+    CHECK(scene_interactor.reorder_objects({id(a), id(b), id(c), id(initial_instance)}));
+    CHECK(order() == std::vector<size_t>{id(a), id(b), id(c), id(initial_instance)});
+
+    scene_interactor.remove_listener<Biz::Scene::ISceneChangedListener>(&listener);
 }

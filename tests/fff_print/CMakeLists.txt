@@ -26,6 +26,7 @@ add_executable(${_TEST_NAME}_tests
 	test_gcodefindreplace.cpp
 	test_gcodewriter.cpp
 	test_cancel_object.cpp
+	test_sequential.cpp
     test_layers.cpp
 	test_model.cpp
 	test_multi.cpp

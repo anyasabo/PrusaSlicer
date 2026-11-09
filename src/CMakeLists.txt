@@ -20,7 +20,7 @@ add_subdirectory(libpgcode)
 add_subdirectory(slic3r-jthread)
 add_subdirectory(libslic3r)
 add_subdirectory(slic3r-biz-arrange)
-#add_subdirectory(libseqarrange)
+add_subdirectory(libseqarrange)
 add_subdirectory(slic3r-biz-lua)
 
 if (SLIC3R_ENABLE_FORMAT_STEP)

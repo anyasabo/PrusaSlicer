@@ -6,6 +6,7 @@
 #include "Slic3r/Domain/SlicingId.hpp"
 #include "Slic3r/Exception.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/ArrangeHelper.hpp"
 #include "libslic3r/Brim.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Extruder.hpp"
@@ -1512,7 +1513,104 @@ void Print::process()
         });
     }
 
-    m_sequential_collision_detected = config().get<bool>("complete_objects") ? std::nullopt /*check_seq_conflict(model(), config())*/ : std::nullopt;
+    // The rafts of the instances: a raft lifts the print, and it is larger than the object.
+    SeqRafts seq_rafts;
+    if (config().get<bool>("complete_objects")) {
+        for (const PrintObject* object : m_objects) {
+            const SlicingParameters& slicing = object->slicing_parameters();
+            if (! slicing.has_raft())
+                continue;
+            const SeqRaft raft{
+                .z_lift = slicing.object_print_z_min,
+                .xy_expansion = object->config().get<double>("raft_expansion") + object->config().get<double>("raft_first_layer_expansion")
+            };
+            for (const PrintInstance& instance : object->instances())
+                seq_rafts[instance.model_instance.id().id] = raft;
+        }
+    }
+
+    // The support layers above the raft: supports can reach outside the object.
+    SeqSupports seq_supports;
+    if (config().get<bool>("complete_objects")) {
+        for (const PrintObject* object : m_objects) {
+            const size_t raft_layers = object->slicing_parameters().raft_layers();
+            std::vector<std::pair<double, Polygon>> layers;
+            for (size_t i = raft_layers; i < object->support_layers().size(); ++i) {
+                const SupportLayer* layer = object->support_layers()[i];
+                Points points;
+                layer->support_fills.collect_points(points);
+                if (points.size() >= 3)
+                    layers.emplace_back(layer->print_z, Slic3r::Geometry::convex_hull(points));
+            }
+            if (layers.empty())
+                continue;
+            // PrintObject coordinates + the shift of the instance = bed coordinates. The check uses coordinates
+            // relative to the offset of the instance.
+            for (const PrintInstance& instance : object->instances()) {
+                const Vec3d offset = instance.model_instance.get_offset();
+                const Point move = instance.shift() - Point(scaled(offset.x()), scaled(offset.y()));
+                SeqSupportLayers& out = seq_supports[instance.model_instance.id().id];
+                for (const auto& [print_z, hull] : layers) {
+                    Polygon moved = hull;
+                    for (Point& pt : moved.points)
+                        pt += move;
+                    out.emplace_back(print_z, std::move(moved));
+                }
+            }
+        }
+    }
+
+    // In a sequential print, the skirt prints before all objects (a draft shield to the height of the highest
+    // object). The extruder of each object hits a skirt that is higher than the lowest part of the toolhead.
+    if (config().get<bool>("complete_objects") && this->has_skirt() && ! m_objects.empty()) {
+        // The G-code prints the skirt at the print_z of the raft layers and of the object layers
+        // (make_skirt_loops_per_extruder_other_layers() in GCode.cpp). Thus a raft layer counts as a skirt layer.
+        double skirt_height_z = 0.;
+        for (const PrintObject* object : m_objects) {
+            std::vector<double> zs;
+            const size_t raft_layers = std::min(object->slicing_parameters().raft_layers(), object->support_layers().size());
+            for (size_t i = 0; i < raft_layers; ++i)
+                zs.push_back(object->support_layers()[i]->print_z);
+            for (const Layer* layer : object->layers())
+                zs.push_back(layer->print_z);
+            if (zs.empty())
+                continue;
+            std::sort(zs.begin(), zs.end());
+            const size_t skirt_layers = this->has_infinite_skirt() ?
+                zs.size() : std::min(size_t(m_config.get<int>("skirt_height")), zs.size());
+            skirt_height_z = std::max(skirt_height_z, zs[skirt_layers - 1]);
+        }
+        // Without gantry data, the real clearance is not known (0). A draft shield is as high as the objects,
+        // so it is a collision for each toolhead. A lower skirt is then not reported.
+        const double clearance = seq_skirt_clearance(config());
+        if ((clearance > 0. && skirt_height_z > clearance) || (clearance == 0. && this->has_infinite_skirt())) {
+            this->append_warning_callback(Biz::Slicing::Warning{
+                .code = Biz::Slicing::WarningCode::SequentialSkirtCollision,
+                .item_keys = {"skirt_height", "draft_shield"},
+                .model_object_id = std::nullopt,
+                .payload = Biz::Slicing::SequentialSkirtWarningPayload{.skirt_height = skirt_height_z, .clearance = clearance},
+                .severity = Biz::Slicing::WarningSeverity::HIGH
+            });
+        }
+    }
+
+    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config(), seq_rafts, seq_supports) : std::nullopt;
+    if (m_sequential_collision_detected) {
+        // The CLI does not show the warnings of the slicing. The log gives the result also there.
+        SPDLOG_WARN("Sequential print: the extruder will crash into {} while printing {}.",
+                    m_sequential_collision_detected->first, m_sequential_collision_detected->second);
+        this->append_warning_callback(Biz::Slicing::Warning{
+            .code = Biz::Slicing::WarningCode::SequentialCollision,
+            .item_keys = {"complete_objects"},
+            .model_object_id = std::nullopt,
+            .payload = Biz::Slicing::SequentialCollisionWarningPayload{
+                .object_hit = m_sequential_collision_detected->first,
+                .object_printed = m_sequential_collision_detected->second,
+                .working_order = find_seq_print_order(model(), config(), seq_rafts, seq_supports).value_or(std::vector<std::string>{})
+            },
+            .severity = Biz::Slicing::WarningSeverity::HIGH
+        });
+    }
 
     SPDLOG_INFO("Slicing process finished. {}", log_memory_info());
 }

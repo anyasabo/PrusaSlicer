@@ -8,6 +8,9 @@
 #include "Slic3r/Domain/ModelInstance.hpp"
 #include "Slic3r/Domain/ElementRef.hpp"
 
+#include <algorithm>
+#include <unordered_map>
+
 namespace Slic3r::Biz::ObjectList {
 
 ObjectObservableList::ObjectObservableList(
@@ -125,6 +128,12 @@ void ObjectObservableList::on_instance_removed(
 }
 
 void ObjectObservableList::on_model_reloaded(Domain::SelectionId project_id)
+{
+    if (project_id == m_project_id)
+        update_data();
+}
+
+void ObjectObservableList::on_objects_reordered(Domain::SelectionId project_id)
 {
     if (project_id == m_project_id)
         update_data();
@@ -397,6 +406,28 @@ void ObjectObservableList::update_data()
                 );
             }
         }
+    }
+
+    // The items in model order: the order of the objects changes (reorder, undo), and a new item is appended.
+    // In a sequential print, this order is the print order.
+    std::unordered_map<size_t, size_t> model_index;
+    for (size_t i = 0; i < objects.size(); ++i) {
+        model_index.emplace(objects[i]->id().id, i);
+    }
+    // An item of an object that is not in the model goes last. on_instance_removed() removes it.
+    const auto index_of = [&model_index](const Object& o) {
+        const auto it = model_index.find(o.id);
+        return it == model_index.end() ? model_index.size() : it->second;
+    };
+    const auto by_model_order = [&index_of](const Object& a, const Object& b) {
+        return index_of(a) < index_of(b);
+    };
+    if (!std::is_sorted(m_items.begin(), m_items.end(), by_model_order)) {
+        this->invoke_listeners<IListObserver<Object>>(
+            [this](auto* l) { l->on_will_be_reset(m_items.size()); }
+        );
+        std::stable_sort(m_items.begin(), m_items.end(), by_model_order);
+        this->invoke_listeners<IListObserver<Object>>([](auto* l) { l->on_reset(); });
     }
 }
 

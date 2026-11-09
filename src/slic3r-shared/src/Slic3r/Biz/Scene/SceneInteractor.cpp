@@ -1450,6 +1450,47 @@ void SceneInteractor::reorder_volume(
     update_elements_bed_placement(reordered, true);
 }
 
+bool SceneInteractor::reorder_objects(const std::vector<size_t>& object_ids)
+{
+    Domain::Project& project         = m_workbench.project(m_selected_project_id);
+    Domain::ModelObjectPtrs& objects = project.model().objects;
+
+    std::vector<Domain::ModelObject*> listed;
+    for (const size_t id : object_ids) {
+        Domain::ModelObject* object = project.find_object_by_id(id);
+        if (object && std::ranges::find(listed, object) == listed.end()) {
+            listed.push_back(object);
+        }
+    }
+
+    // Put the listed objects into their own places, in the new order.
+    bool changed = false;
+    auto next    = listed.begin();
+    for (Domain::ModelObject*& object : objects) {
+        if (std::ranges::find(listed, object) == listed.end()) {
+            continue;
+        }
+        ASSERT(next != listed.end());
+        changed |= object != *next;
+        object = *next++;
+    }
+    if (!changed) {
+        return false;
+    }
+
+    invoke_listeners<ISceneChangedListener>(
+        [&](auto* l) { l->on_objects_reordered(m_selected_project_id); }
+    );
+
+    // Print::apply() sees the new order of its PrintObjects and makes the G-code again.
+    for (const std::unique_ptr<Domain::ConfigContainer>& config_container : project.config_containers()) {
+        for (const auto& bed_instance : config_container->bed_instances()) {
+            invoke_slicing_input_changed(BedRef{config_container->id().id, bed_instance->id().id});
+        }
+    }
+    return true;
+}
+
 void SceneInteractor::set_printable(const Domain::ElementRef& id, bool is_printable)
 {
     ASSERT(id.volume_id == 0);

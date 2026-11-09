@@ -362,6 +362,35 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
             detail.height, detail.object_names[0], detail.object_names[1]);
     }
 
+    case WarningCode::SequentialSkirtCollision: {
+        const auto& detail = std::get<Biz::Slicing::SequentialSkirtWarningPayload>(warning.payload);
+        if (detail.clearance <= 0.)
+            return _u8L("In sequential printing, the draft shield prints before all objects, and the extruder "
+                "will hit it. Turn off the draft shield.");
+        // TRN {0} is the skirt height in mm, {1} is the height in mm that the extruder clears.
+        return fmt::format(fmt::runtime(_u8L("In sequential printing, the skirt prints before all objects. "
+            "It is {0:.2f} mm high, but the extruder clears only {1:.2f} mm, so it will hit the skirt. "
+            "Lower the skirt height or turn off the draft shield.")),
+            detail.skirt_height, detail.clearance);
+    }
+    case WarningCode::SequentialCollision: {
+        const auto& detail = std::get<Biz::Slicing::SequentialCollisionWarningPayload>(warning.payload);
+        if (! detail.working_order.empty()) {
+            std::string order;
+            for (const std::string& name : detail.working_order)
+                order += (order.empty() ? "" : ", ") + name;
+            // TRN {0} is the name of the object that is hit, {1} is the name of the object that is printed,
+            // {2} is a list of object names in print order.
+            return fmt::format(fmt::runtime(_u8L("Extruder will crash into {0} while printing {1}. "
+                "Print the objects in this order to avoid it: {2}.")),
+                detail.object_hit, detail.object_printed, order);
+        }
+        // TRN {0} is the name of the object that is hit, {1} is the name of the object that is printed.
+        return fmt::format(fmt::runtime(_u8L("Extruder will crash into {0} while printing {1}. "
+            "Move the objects further apart or arrange them again.")),
+            detail.object_hit, detail.object_printed);
+    }
+
     case WarningCode::XYSizeCompensationIgnoredMultiMaterialPainting:
         message = _u8L(
             "An object has enabled XY size compensation which will not be used "

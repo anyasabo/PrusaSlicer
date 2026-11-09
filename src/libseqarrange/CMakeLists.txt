@@ -3,9 +3,11 @@ slic3r_remap_configs("z3::libz3" RelWithDebInfo Release)
 
 
 
-add_library(libseqarrange STATIC src/seq_interface.cpp src/seq_preprocess.cpp src/seq_sequential.cpp src/seq_utilities.cpp)
+add_library(libseqarrange STATIC src/seq_interface.cpp src/seq_greedy.cpp src/seq_preprocess.cpp src/seq_sequential.cpp src/seq_utilities.cpp)
 set_target_properties(libseqarrange PROPERTIES PREFIX "")
-target_include_directories(libseqarrange PUBLIC include PRIVATE src )
+# seq_interface.hpp and the sources use libslic3r headers (Polygon, ConvexHull, ExPolygon) that libslic3r keeps in its
+# private src directory. Use the same path as tests/CMakeLists.txt (test_common).
+target_include_directories(libseqarrange PUBLIC include "$<TARGET_PROPERTY:libslic3r,SOURCE_DIR>/src" PRIVATE src )
 target_link_libraries(libseqarrange PUBLIC libslic3r PRIVATE z3::libz3)
 
 add_executable(sequential_decimator src/sequential_decimator.cpp)
@@ -24,6 +26,11 @@ if (SLIC3R_BUILD_TESTS)
     add_executable(libseqarrange_tests test/prusaparts.cpp test/seq_test_polygon.cpp test/seq_test_sequential.cpp test/seq_test_preprocess.cpp test/seq_test_interface.cpp)
     target_include_directories(libseqarrange_tests PRIVATE src )
     target_link_libraries(libseqarrange_tests PRIVATE Catch2::Catch2WithMain libseqarrange)
+
+    # Benchmark and quality check of the arrange with the corpus in test/corpus (see test/seqarrange_bench.cpp).
+    add_executable(seqarrange_bench test/seqarrange_bench.cpp)
+    target_include_directories(seqarrange_bench PRIVATE src)
+    target_link_libraries(seqarrange_bench PRIVATE libseqarrange)
 
     set(_catch_args "exclude:[NotWorking] exclude:[Slow]")
     list(APPEND _catch_args "${CATCH_EXTRA_ARGS}")

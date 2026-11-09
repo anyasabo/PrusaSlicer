@@ -14,6 +14,8 @@
 #include <libslic3r/Geometry/ConvexHull.hpp>
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 
+#include <atomic>
+
 #include "seq_defs.hpp"
 
 #include "seq_sequential.hpp"
@@ -32,6 +34,53 @@ using Algorithms::SVG::SVG;
 
 namespace Sequential
 {
+
+/*----------------------------------------------------------------*/
+
+namespace
+{
+    std::atomic<long> solver_checks{0};
+    std::atomic<long> solver_sat{0};
+    std::atomic<long> solver_unsat{0};
+    std::atomic<long> solver_unknown{0};
+} // namespace
+
+
+SolverStatistics get_SolverStatistics()
+{
+    return SolverStatistics{solver_checks.load(), solver_sat.load(), solver_unsat.load(), solver_unknown.load()};
+}
+
+
+void reset_SolverStatistics()
+{
+    solver_checks = 0;
+    solver_sat = 0;
+    solver_unsat = 0;
+    solver_unknown = 0;
+}
+
+
+static void set_SolverLimits(const SolverConfiguration &solver_configuration)
+{
+    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    z3::set_param("rlimit", solver_configuration.optimization_rlimit.c_str());
+}
+
+
+static z3::check_result check_Counted(z3::solver &Solver, const z3::expr_vector &assumptions)
+{
+    const z3::check_result result = Solver.check(assumptions);
+    ++solver_checks;
+    switch (result)
+    {
+    case z3::sat:     ++solver_sat;     break;
+    case z3::unsat:   ++solver_unsat;   break;
+    case z3::unknown: ++solver_unknown; break;
+    }
+    return result;
+}
+
 
     
 /*----------------------------------------------------------------*/
@@ -7658,7 +7707,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 					const std::vector<Slic3r::Polygon> &polygons)
 {
 
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     
     int last_solvable_bounding_box_size = -1;
 
@@ -7685,7 +7734,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 	    
 	bool sat = false;
 
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{	    
@@ -7731,7 +7780,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 		
 		if (refined)
 		{
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {	    
@@ -7809,7 +7858,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 					const string_map                   &dec_var_names_map,
 					const std::vector<Slic3r::Polygon> &polygons)
 {
-    Z3_global_param_set("timeout", solver_configuration.optimization_timeout.c_str());        
+    set_SolverLimits(solver_configuration);
     int last_solvable_bounding_box_size = -1;
 
     // general plate polygons are currently not supported
@@ -7835,7 +7884,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 	    
 	bool sat = false;
 
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{	    
@@ -7882,7 +7931,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 		
 		if (refined)
 		{
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {	    
@@ -7962,7 +8011,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 					const std::vector<Slic3r::Polygon> &polygons)
 {
 
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     int last_solvable_bounding_box_size = -1;
 
     // general plate polygons are currently not supported
@@ -7988,7 +8037,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 	    
 	bool sat = false;
 
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{	    
@@ -8034,7 +8083,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 		
 		if (refined)
 		{
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {	    
@@ -8116,7 +8165,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 					const string_map                   &dec_var_names_map,
 					const std::vector<Slic3r::Polygon> &polygons)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());        
+    set_SolverLimits(solver_configuration);
     int last_solvable_bounding_box_size = -1;
 
     // general plate polygons are currently not supported
@@ -8143,7 +8192,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 
 	bool sat = false;
 
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{	    
@@ -8192,7 +8241,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 		
 		if (refined)
 		{
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {	    
@@ -8273,7 +8322,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 					const string_map                   &dec_var_names_map,
 					const std::vector<Slic3r::Polygon> &polygons)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());        
+    set_SolverLimits(solver_configuration);
     int last_solvable_bounding_box_size = -1;
     
     std::vector<Rational> local_dec_values_X = dec_values_X;
@@ -8303,7 +8352,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 
 	bool sat = false;
 
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{
@@ -8352,7 +8401,7 @@ bool optimize_WeakPolygonNonoverlapping(z3::solver                         &Solv
 		{
 		    bool refined_sat = false;
 
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {
@@ -8483,7 +8532,7 @@ bool optimize_SequentialWeakPolygonNonoverlapping(z3::solver                    
 						  const std::vector<Slic3r::Polygon>               &polygons,
 						  const std::vector<std::vector<Slic3r::Polygon> > &unreachable_polygons)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     
     int last_solvable_bounding_box_size = -1;
 
@@ -8515,7 +8564,7 @@ bool optimize_SequentialWeakPolygonNonoverlapping(z3::solver                    
 
 	bool sat = false;
 	
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{
@@ -8573,7 +8622,7 @@ bool optimize_SequentialWeakPolygonNonoverlapping(z3::solver                    
 		{
 		    bool refined_sat = false;
 		    
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {
@@ -8685,7 +8734,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingCentered(z3::solver            
 							  const std::vector<Slic3r::Polygon>               &polygons,
 							  const std::vector<std::vector<Slic3r::Polygon> > &unreachable_polygons)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());    
+    set_SolverLimits(solver_configuration);
     
     int last_solvable_bounding_box_size = -1;
 
@@ -8722,7 +8771,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingCentered(z3::solver            
 
 	bool sat = false;
 	
-	switch (Solver.check(bounding_box_assumptions))
+	switch (check_Counted(Solver, bounding_box_assumptions))
 	{
 	case z3::sat:
 	{
@@ -8780,7 +8829,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingCentered(z3::solver            
 		{
 		    bool refined_sat = false;
 
-		    switch (Solver.check(bounding_box_assumptions))
+		    switch (check_Counted(Solver, bounding_box_assumptions))
 		    {
 		    case z3::sat:
 		    {
@@ -9034,7 +9083,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver      
 								const std::vector<Slic3r::Polygon>               &polygons,
 								const std::vector<std::vector<Slic3r::Polygon> > &unreachable_polygons)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());    
+    set_SolverLimits(solver_configuration);
    
     coord_t last_solvable_bounding_box_size = -1;
 
@@ -9094,7 +9143,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver      
 							  polygons,
 							  unreachable_polygons))
 	{
-	    switch (Solver.check(bounding_box_assumptions))
+	    switch (check_Counted(Solver, bounding_box_assumptions))
 	    {
 	    case z3::sat:
 	    {
@@ -9165,7 +9214,7 @@ bool optimize_SequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver      
 								      polygons,
 								      unreachable_polygons))
 		    {
-			switch (Solver.check(bounding_box_assumptions))
+			switch (check_Counted(Solver, bounding_box_assumptions))
 			{
 			case z3::sat:
 			{
@@ -9323,7 +9372,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 								   const ProgressRange                              &progress_range,								   
 								   std::function<void(int)>                          progress_callback)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     
     #ifdef DEBUG
     {    
@@ -9410,7 +9459,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 							  polygons,
 							  unreachable_polygons))
 	{	    
-	    switch (Solver.check(complete_assumptions))
+	    switch (check_Counted(Solver, complete_assumptions))
 	    {
 	    case z3::sat:
 	    {
@@ -9486,7 +9535,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 									  polygons,
 									  unreachable_polygons))
 			{			    
-			    switch (Solver.check(complete_assumptions))
+			    switch (check_Counted(Solver, complete_assumptions))
 			    {
 			    case z3::sat:
 			    {
@@ -9641,7 +9690,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 								   const ProgressRange                              &progress_range,
 								   std::function<void(int)>                          progress_callback)
 {
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     
     #ifdef DEBUG
     {    
@@ -9724,7 +9773,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 							  polygons,
 							  unreachable_polygons))
 	{	    
-	    switch (Solver.check(complete_assumptions))
+	    switch (check_Counted(Solver, complete_assumptions))
 	    {
 	    case z3::sat:
 	    {
@@ -9800,7 +9849,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 									  polygons,
 									  unreachable_polygons))
 			{			    
-			    switch (Solver.check(complete_assumptions))
+			    switch (check_Counted(Solver, complete_assumptions))
 			    {
 			    case z3::sat:
 			    {
@@ -9948,7 +9997,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
     assert(Algorithms::Polygon::is_counter_clockwise(solver_configuration.plate_bounding_polygon));
     assert(solver_configuration.plate_bounding_polygon.points.size() > 0);
 	   
-    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+    set_SolverLimits(solver_configuration);
     
     #ifdef DEBUG
     {    
@@ -10077,7 +10126,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 							  polygons,
 							  unreachable_polygons))
 	{
-	    switch (Solver.check(complete_assumptions))
+	    switch (check_Counted(Solver, complete_assumptions))
 	    {
 	    case z3::sat:
 	    {
@@ -10150,7 +10199,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 									  polygons,
 									  unreachable_polygons))
 			{			    
-			    switch (Solver.check(complete_assumptions))
+			    switch (check_Counted(Solver, complete_assumptions))
 			    {
 			    case z3::sat:
 			    {
@@ -10291,7 +10340,8 @@ void augment_TemporalSpread(const SolverConfiguration &solver_configuration,
 			    std::vector<Rational>     &dec_values_T,
 			    const std::vector<int>    &decided_polygons)
 {
-    std::map<double, int, std::less<double>> sorted_polygons;
+    // A multimap: two objects can have the same time, and each must get a new time.
+    std::multimap<double, int, std::less<double>> sorted_polygons;
 
     #ifdef DEBUG
     {
@@ -10305,7 +10355,7 @@ void augment_TemporalSpread(const SolverConfiguration &solver_configuration,
 	
     for (unsigned int i = 0; i < decided_polygons.size(); ++i)
     {
-	sorted_polygons[dec_values_T[decided_polygons[i]].as_double()] = decided_polygons[i];
+	sorted_polygons.emplace(dec_values_T[decided_polygons[i]].as_double(), decided_polygons[i]);
     }
     
     int time = SEQ_GROUND_PRESENCE_TIME + 2 * solver_configuration.temporal_spread * solver_configuration.object_group_size;
@@ -10552,7 +10602,7 @@ bool optimize_SubglobalSequentialPolygonNonoverlapping(const SolverConfiguration
 	int remaining_polygon = 0;
 	for(int object_group_size = MIN((unsigned int)solver_configuration.object_group_size, polygons.size() - curr_polygon); object_group_size > 0; --object_group_size)
 	{
-	    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+	    set_SolverLimits(solver_configuration);
 	    
 	    z3::context z_context;
 	    z3::solver z_solver(z_context);
@@ -10787,7 +10837,7 @@ bool optimize_SubglobalSequentialPolygonNonoverlappingCentered(const SolverConfi
 	int remaining_polygon = 0;
 	for(int object_group_size = MIN((unsigned int)solver_configuration.object_group_size, polygons.size() - curr_polygon); object_group_size > 0; --object_group_size)
 	{
-	    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+	    set_SolverLimits(solver_configuration);
 	    
 	    z3::context z_context;
 	    z3::solver z_solver(z_context);
@@ -11037,7 +11087,7 @@ bool optimize_SubglobalSequentialPolygonNonoverlappingBinaryCentered(const Solve
 
 	for(int object_group_size = MIN((unsigned int)solver_configuration.object_group_size, polygons.size() - curr_polygon); object_group_size > 0; --object_group_size)
 	{
-	    z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+	    set_SolverLimits(solver_configuration);
 	    
 	    z3::context z_context;
 	    z3::solver z_solver(z_context);
@@ -11297,7 +11347,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
     for (unsigned int curr_polygon = 0; curr_polygon < polygons.size(); /* nothing */)
     {	
 	bool optimized = false;
-	z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+	set_SolverLimits(solver_configuration);
 	    
 	z3::context z_context;
 	z3::solver z_solver(z_context);
@@ -11594,7 +11644,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
     for (curr_polygon = 0; curr_polygon < solvable_objects.size(); /* nothing */)
     {
 	bool optimized = false;
-	z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
+	set_SolverLimits(solver_configuration);
 	    
 	z3::context z_context;
 	z3::solver z_solver(z_context);

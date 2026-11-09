@@ -13,7 +13,10 @@
 
 #include "seq_sequential.hpp"
 #include "seq_preprocess.hpp"
+#include <set>
+
 #include "libseqarrange/seq_interface.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 
 /*----------------------------------------------------------------*/
@@ -79,7 +82,7 @@ bool PrinterGeometry::convert_Geometry2PlateBounds(Slic3r::BoundingBox &plate_bo
 {
     BoundingBox plate_box = get_extents(plate);
     
-    if (fabs(plate.area() - plate_box.polygon().area()) > EPSILON)
+    if (fabs(plate.area() - Slic3r::Biz::Algorithms::BoundingBox::to_polygon(plate_box).area()) > EPSILON)
     {
 	for (unsigned int i = 0; i < plate.points.size(); ++i)
 	{
@@ -110,6 +113,7 @@ SolverConfiguration::SolverConfiguration()
     , temporal_spread(SEQ_SCHEDULING_TEMPORAL_SPREAD)
     , decimation_precision(SEQ_DECIMATION_PRECISION_LOW)
     , optimization_timeout(SEQ_Z3_SOLVER_TIMEOUT)
+    , optimization_rlimit("0")
 {
 	/* nothing */
 }
@@ -124,6 +128,7 @@ SolverConfiguration::SolverConfiguration(const PrinterGeometry &printer_geometry
     , temporal_spread(SEQ_SCHEDULING_TEMPORAL_SPREAD)
     , decimation_precision(SEQ_DECIMATION_PRECISION_LOW)
     , optimization_timeout(SEQ_Z3_SOLVER_TIMEOUT)
+    , optimization_rlimit("0")
 {
     setup(printer_geometry);
 }
@@ -194,16 +199,17 @@ bool check_ScheduledObjectsForSequentialPrintability(const SolverConfiguration  
 }
     
 
-std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(const SolverConfiguration         &solver_configuration,
-										const PrinterGeometry             &printer_geometry,
-										const std::vector<ObjectToPrint>  &objects_to_print,
-										const std::vector<ScheduledPlate> &scheduled_plates)
+/*
+  Prepares the object polygon and the unreachable zone polygons of each object, in solver units, as the check
+  uses them. flat_index_map maps an object id to its index in objects_to_print.
+*/
+static void prepare_CheckPolygons(const SolverConfiguration                  &solver_configuration,
+				  const PrinterGeometry                      &printer_geometry,
+				  const std::vector<ObjectToPrint>           &objects_to_print,
+				  std::vector<Slic3r::Polygon>               &polygons,
+				  std::vector<std::vector<Slic3r::Polygon> > &unreachable_polygons,
+				  std::map<int, int>                         &flat_index_map)
 {
-    std::vector<Slic3r::Polygon> polygons;
-    std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
-
-    std::map<int, int> flat_index_map;
-
     for (unsigned int i = 0; i < objects_to_print.size(); ++i)
     {
 	std::vector<Slic3r::Polygon> convex_level_polygons;	    
@@ -238,6 +244,19 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
 	unreachable_polygons.push_back(scale_down_unreachable_polygons);
 	polygons.push_back(scale_down_object_polygon);       
     }
+}
+
+
+std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(const SolverConfiguration         &solver_configuration,
+										const PrinterGeometry             &printer_geometry,
+										const std::vector<ObjectToPrint>  &objects_to_print,
+										const std::vector<ScheduledPlate> &scheduled_plates)
+{
+    std::vector<Slic3r::Polygon> polygons;
+    std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
+    std::map<int, int> flat_index_map;
+
+    prepare_CheckPolygons(solver_configuration, printer_geometry, objects_to_print, polygons, unreachable_polygons, flat_index_map);
     
     for (const auto& scheduled_plate: scheduled_plates)
     {
@@ -329,6 +348,201 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
     #endif
     
     return {};    
+}
+
+
+std::optional<std::vector<int> > find_ObjectOrderForSequentialPrint(const SolverConfiguration        &solver_configuration,
+								    const PrinterGeometry            &printer_geometry,
+								    const std::vector<ObjectToPrint> &objects_to_print,
+								    const ScheduledPlate             &scheduled_plate,
+								    std::pair<int, int>              *blocking_pair,
+								    const std::vector<int>           &groups)
+{
+    std::vector<Slic3r::Polygon> polygons;
+    std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
+    std::map<int, int> flat_index_map;
+
+    prepare_CheckPolygons(solver_configuration, printer_geometry, objects_to_print, polygons, unreachable_polygons, flat_index_map);
+
+    const std::vector<ScheduledObject> &objects = scheduled_plate.scheduled_objects;
+    const int n = int(objects.size());
+
+    // conflict(a, b): the extruder hits a when b is printed after a. A conflict is a relation between two
+    // objects and their order, so the check of two objects at a time is the same as the check of the plate.
+    // The same times as check_ScheduledObjectsForSequentialConflict() gives the first two objects of a plate.
+    const int time_step = 2 * solver_configuration.temporal_spread * solver_configuration.object_group_size;
+    const Rational first_time(SEQ_GROUND_PRESENCE_TIME + time_step);
+    const Rational second_time(SEQ_GROUND_PRESENCE_TIME + 2 * time_step);
+    auto conflict = [&](int a, int b) -> bool
+    {
+	const int fa = flat_index_map.at(objects[a].id);
+	const int fb = flat_index_map.at(objects[b].id);
+	const std::vector<Rational> X{scaleDown_CoordinateForSequentialSolver(objects[a].x), scaleDown_CoordinateForSequentialSolver(objects[b].x)};
+	const std::vector<Rational> Y{scaleDown_CoordinateForSequentialSolver(objects[a].y), scaleDown_CoordinateForSequentialSolver(objects[b].y)};
+	const std::vector<Rational> T{first_time, second_time};
+	const std::vector<Slic3r::Polygon> P{polygons[fa], polygons[fb]};
+	const std::vector<std::vector<Slic3r::Polygon> > U{unreachable_polygons[fa], unreachable_polygons[fb]};
+	return check_PointsOutsidePolygons(X, Y, T, P, U).has_value() || check_PolygonLineIntersections(X, Y, T, P, U).has_value();
+    };
+
+    // The units of the sort: the groups, in the order of their first object. Each group keeps the given
+    // order of its objects (for example the instances of one model object, which print one after the other).
+    std::vector<int> group_of(n);
+    std::vector<std::vector<int> > members;
+    {
+	std::map<int, int> unit_of_group;
+	for (int i = 0; i < n; ++i)
+	{
+	    const int g = groups.empty() ? i : groups[i];
+	    auto [it, inserted] = unit_of_group.emplace(g, int(members.size()));
+	    if (inserted)
+	    {
+		members.emplace_back();
+	    }
+	    group_of[i] = it->second;
+	    members[it->second].push_back(i);
+	}
+    }
+    const int m = int(members.size());
+
+    // Inside a group the order is fixed: it must work as it is.
+    for (const std::vector<int> &group : members)
+    {
+	for (size_t i = 0; i < group.size(); ++i)
+	{
+	    for (size_t j = i + 1; j < group.size(); ++j)
+	    {
+		if (conflict(group[i], group[j]))
+		{
+		    if (blocking_pair != nullptr)
+		    {
+			*blocking_pair = std::make_pair(objects[group[i]].id, objects[group[j]].id);
+		    }
+		    return std::nullopt;
+		}
+	    }
+	}
+    }
+
+    // Between two groups G and H: G before H fails if any object of G is hit by any object of H.
+    // before[h] holds the groups that must print before group h.
+    std::vector<std::vector<int> > before(m);
+    std::vector<int> pending(m, 0);
+    for (int g = 0; g < m; ++g)
+    {
+	for (int h = g + 1; h < m; ++h)
+	{
+	    std::pair<int, int> g_then_h_hit{-1, -1}, h_then_g_hit{-1, -1};
+	    for (int a : members[g])
+	    {
+		for (int b : members[h])
+		{
+		    if (g_then_h_hit.first < 0 && conflict(a, b))
+		    {
+			g_then_h_hit = std::make_pair(a, b);
+		    }
+		    if (h_then_g_hit.first < 0 && conflict(b, a))
+		    {
+			h_then_g_hit = std::make_pair(b, a);
+		    }
+		}
+	    }
+	    const bool g_then_h = g_then_h_hit.first >= 0;
+	    const bool h_then_g = h_then_g_hit.first >= 0;
+	    if (g_then_h && h_then_g)
+	    {
+		if (blocking_pair != nullptr)
+		{
+		    *blocking_pair = std::make_pair(objects[g_then_h_hit.first].id, objects[g_then_h_hit.second].id);
+		}
+		return std::nullopt;
+	    }
+	    if (g_then_h)
+	    {
+		before[g].push_back(h);  // h must print before g
+		++pending[g];
+	    }
+	    else if (h_then_g)
+	    {
+		before[h].push_back(g);  // g must print before h
+		++pending[h];
+	    }
+	}
+    }
+
+    // Topological order. Of the groups that are free, take the one that is first in the given order.
+    std::vector<std::vector<int> > after(m);
+    for (int h = 0; h < m; ++h)
+    {
+	for (int g : before[h])
+	{
+	    after[g].push_back(h);
+	}
+    }
+    std::set<int> free_groups;
+    for (int g = 0; g < m; ++g)
+    {
+	if (pending[g] == 0)
+	{
+	    free_groups.insert(g);
+	}
+    }
+    std::vector<int> order;
+    int placed = 0;
+    while (!free_groups.empty())
+    {
+	const int g = *free_groups.begin();
+	free_groups.erase(free_groups.begin());
+	++placed;
+	for (int i : members[g])
+	{
+	    order.push_back(objects[i].id);
+	}
+	for (int h : after[g])
+	{
+	    if (--pending[h] == 0)
+	    {
+		free_groups.insert(h);
+	    }
+	}
+    }
+    if (placed != m)
+    {
+	// A cycle of three or more groups. Walk back from a waiting group along the waiting groups that must
+	// print before it, until a group repeats: that group is on a cycle. Report the first objects of two
+	// groups of the cycle.
+	if (blocking_pair != nullptr)
+	{
+	    int g = 0;
+	    while (pending[g] == 0)
+	    {
+		++g;
+	    }
+	    std::vector<bool> seen(m, false);
+	    while (!seen[g])
+	    {
+		seen[g] = true;
+		for (int f : before[g])
+		{
+		    if (pending[f] > 0)
+		    {
+			g = f;
+			break;
+		    }
+		}
+	    }
+	    for (int f : before[g])
+	    {
+		if (pending[f] > 0)
+		{
+		    *blocking_pair = std::make_pair(objects[members[f].front()].id, objects[members[g].front()].id);
+		    break;
+		}
+	    }
+	}
+	return std::nullopt;
+    }
+    return order;
 }
 
 
@@ -499,7 +713,7 @@ void schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -518,7 +732,7 @@ void schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {		
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));
@@ -916,7 +1130,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver_
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -935,7 +1149,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver_
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));
@@ -1255,7 +1469,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -1274,7 +1488,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));

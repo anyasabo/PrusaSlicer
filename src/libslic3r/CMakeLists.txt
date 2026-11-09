@@ -81,8 +81,8 @@ set(SLIC3R_SOURCES
     src/libslic3r/Arachne/utils/SquareGrid.hpp
     src/libslic3r/Arachne/WallToolPaths.cpp
     src/libslic3r/Arachne/WallToolPaths.hpp
-#    src/libslic3r/ArrangeHelper.cpp
-#    src/libslic3r/ArrangeHelper.hpp
+    src/libslic3r/ArrangeHelper.cpp
+    src/libslic3r/ArrangeHelper.hpp
     src/libslic3r/AStar.hpp
     src/libslic3r/BranchingTree/BranchingTree.cpp
     src/libslic3r/BranchingTree/BranchingTree.hpp
@@ -418,6 +418,7 @@ set(SLIC3R_PUBLIC_HEADERS
     include/libslic3r/IPrint.hpp
     include/libslic3r/InitPrint.hpp
     include/libslic3r/PrintSteps.hpp
+    include/libslic3r/SeqArrange.hpp
     include/libslic3r/SerializedConfig.hpp
     include/libslic3r/SLAResult.hpp
     include/libslic3r/Slicing.hpp
@@ -478,7 +479,7 @@ target_link_libraries(libslic3r PUBLIC
     LibBGCode::bgcode_convert
     agg
     ankerl
-    #libseqarrange
+    libseqarrange
     slic3r-jthread
     slic3r-domain
     slic3r-gcode-reader

@@ -192,7 +192,8 @@ std::vector<double> slice_heights(const Sequential::PrinterGeometry& printer_geo
 // An instance with the projections of its convex hull above each height, relative to the instance offset.
 // footprint_growth (mm) grows the polygon at the bed (for example by the brim).
 Sequential::ObjectToPrint make_object_to_print(const Domain::ModelObject& mo, const Domain::ModelInstance& mi, const std::vector<double>& heights,
-                                               const SeqRaft& raft, double footprint_growth = 0.)
+                                               const SeqRaft& raft, double footprint_growth = 0., const SeqSupportLayers* supports = nullptr,
+                                               double growth = 0.)
 {
 	namespace TriMesh = Biz::Algorithms::TriangleMesh;
 	using Biz::Algorithms::BoundingBox::sizes;
@@ -211,8 +212,16 @@ Sequential::ObjectToPrint make_object_to_print(const Domain::ModelObject& mo, co
 		} else {
 			pgn = TriMesh::its_convex_hull_2d_above(raw_mesh.its, mi.get_matrix_no_offset().cast<float>(), h - raft.z_lift - mi.get_offset().z());
 		}
-		if (h == 0.)
-			pgn = grow_convex(pgn, footprint_growth);
+		pgn = grow_convex(pgn, h == 0. ? std::max(footprint_growth, growth) : growth);
+		// The support layers above h: the toolhead slice at h is hit by them too.
+		if (supports != nullptr) {
+			Points points = pgn.points;
+			for (const auto& [print_z, hull] : *supports)
+				if (print_z > h)
+					points.insert(points.end(), hull.points.begin(), hull.points.end());
+			if (points.size() > pgn.points.size())
+				pgn = Slic3r::Geometry::convex_hull(points);
+		}
 		otp.pgns_at_height.emplace_back(scaled(h), std::move(pgn));
 	}
 	return otp;
@@ -220,7 +229,8 @@ Sequential::ObjectToPrint make_object_to_print(const Domain::ModelObject& mo, co
 
 // Collects the printable instances in model order, with the projections of their convex hulls
 // above each height of the printer geometry.
-std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry, const SeqRafts& rafts)
+std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model& model, const Sequential::PrinterGeometry& printer_geometry, const SeqRafts& rafts,
+                                                            const SeqSupports& supports)
 {
 	const std::vector<double> heights = slice_heights(printer_geometry);
 	std::vector<Sequential::ObjectToPrint> objects;
@@ -230,7 +240,9 @@ std::vector<Sequential::ObjectToPrint> get_objects_to_print(const Domain::Model&
 				continue;
 			// A raft lifts the instance, and it is larger than the instance.
 			const auto raft_it = rafts.find(mi->id().id);
-			objects.push_back(make_object_to_print(*mo, *mi, heights, raft_it == rafts.end() ? SeqRaft{} : raft_it->second));
+			const auto support_it = supports.find(mi->id().id);
+			objects.push_back(make_object_to_print(*mo, *mi, heights, raft_it == rafts.end() ? SeqRaft{} : raft_it->second, 0.,
+			                                       support_it == supports.end() ? nullptr : &support_it->second));
 		}
 	}
 	return objects;
@@ -259,13 +271,13 @@ std::string instance_name(const Domain::Model& model, int instance_id)
 
 } // namespace
 
-std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts)
+std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts, const SeqSupports& supports)
 {
 	Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
 	if (printer_geometry.extruder_slices.empty())
 		return std::nullopt;
 	Sequential::SolverConfiguration solver_config(printer_geometry);
-	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts);
+	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts, supports);
 	// The user can change the order of the objects, not of the instances inside an object, and the instances of
 	// an object print one after the other (sort_object_instances_by_model_order()). Thus each object is a group.
 	std::vector<int> groups;
@@ -284,14 +296,14 @@ std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model
 	return names;
 }
 
-std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts)
+std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts, const SeqSupports& supports)
 {
 	Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
 	if (printer_geometry.extruder_slices.empty())
 		return std::nullopt;
 
 	Sequential::SolverConfiguration solver_config(printer_geometry);
-	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts);
+	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts, supports);
 	if (objects.size() < 2)
 		return std::nullopt;
 
@@ -372,6 +384,12 @@ SeqArrange::SeqArrange(const Domain::Model& model, const Domain::ConfigView& con
 	data->printer_geometry = get_printer_geometry(config);
 	const std::vector<double> heights = slice_heights(data->printer_geometry);
 	const SeqRaft raft = seq_config_raft(config);
+	// The arrange runs before the slicing, so the supports are not known. Automatic supports can reach outside the
+	// object: measured with grid, snug and organic supports, up to 5 mm at the bed (base, support brim) and 2.1 mm
+	// above. If automatic supports are on, all shapes grow by these distances. Print checks the real supports later.
+	const bool auto_supports = config.get<Domain::SupportMode>("support_material") == Domain::SupportMode::Everywhere;
+	const double support_footprint = auto_supports ? 5. : 0.;
+	const double support_growth = auto_supports ? 2.5 : 0.;
 	const BoundingBox bed = get_extents(data->printer_geometry.plate);
 	const std::set<size_t> wanted(instance_ids.begin(), instance_ids.end());
 
@@ -381,7 +399,8 @@ SeqArrange::SeqArrange(const Domain::Model& model, const Domain::ConfigView& con
 		for (const Domain::ModelInstance* mi : mo->instances) {
 			if (! mi->printable || ! wanted.count(mi->id().id))
 				continue;
-			Sequential::ObjectToPrint otp = make_object_to_print(*mo, *mi, heights, raft, std::max(brim, raft.xy_expansion));
+			Sequential::ObjectToPrint otp = make_object_to_print(*mo, *mi, heights, raft, std::max({brim, raft.xy_expansion, support_footprint}),
+			                                                     nullptr, support_growth);
 			const BoundingBox footprint = otp.pgns_at_height.empty() ? BoundingBox() : get_extents(otp.pgns_at_height.front().second);
 			if (! footprint.defined || Algorithms::BoundingBox::sizes(footprint).x() >= Algorithms::BoundingBox::sizes(bed).x() ||
 			    Algorithms::BoundingBox::sizes(footprint).y() >= Algorithms::BoundingBox::sizes(bed).y()) {

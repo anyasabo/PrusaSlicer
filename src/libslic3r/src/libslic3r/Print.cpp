@@ -1529,6 +1529,37 @@ void Print::process()
         }
     }
 
+    // The support layers above the raft: supports can reach outside the object.
+    SeqSupports seq_supports;
+    if (config().get<bool>("complete_objects")) {
+        for (const PrintObject* object : m_objects) {
+            const size_t raft_layers = object->slicing_parameters().raft_layers();
+            std::vector<std::pair<double, Polygon>> layers;
+            for (size_t i = raft_layers; i < object->support_layers().size(); ++i) {
+                const SupportLayer* layer = object->support_layers()[i];
+                Points points;
+                layer->support_fills.collect_points(points);
+                if (points.size() >= 3)
+                    layers.emplace_back(layer->print_z, Slic3r::Geometry::convex_hull(points));
+            }
+            if (layers.empty())
+                continue;
+            // PrintObject coordinates + the shift of the instance = bed coordinates. The check uses coordinates
+            // relative to the offset of the instance.
+            for (const PrintInstance& instance : object->instances()) {
+                const Vec3d offset = instance.model_instance.get_offset();
+                const Point move = instance.shift() - Point(scaled(offset.x()), scaled(offset.y()));
+                SeqSupportLayers& out = seq_supports[instance.model_instance.id().id];
+                for (const auto& [print_z, hull] : layers) {
+                    Polygon moved = hull;
+                    for (Point& pt : moved.points)
+                        pt += move;
+                    out.emplace_back(print_z, std::move(moved));
+                }
+            }
+        }
+    }
+
     // In a sequential print, the skirt prints before all objects (a draft shield to the height of the highest
     // object). The extruder of each object hits a skirt that is higher than the lowest part of the toolhead.
     if (config().get<bool>("complete_objects") && this->has_skirt() && ! m_objects.empty()) {
@@ -1563,7 +1594,7 @@ void Print::process()
         }
     }
 
-    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config(), seq_rafts) : std::nullopt;
+    m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config(), seq_rafts, seq_supports) : std::nullopt;
     if (m_sequential_collision_detected) {
         // The CLI does not show the warnings of the slicing. The log gives the result also there.
         SPDLOG_WARN("Sequential print: the extruder will crash into {} while printing {}.",
@@ -1575,7 +1606,7 @@ void Print::process()
             .payload = Biz::Slicing::SequentialCollisionWarningPayload{
                 .object_hit = m_sequential_collision_detected->first,
                 .object_printed = m_sequential_collision_detected->second,
-                .working_order = find_seq_print_order(model(), config(), seq_rafts).value_or(std::vector<std::string>{})
+                .working_order = find_seq_print_order(model(), config(), seq_rafts, seq_supports).value_or(std::vector<std::string>{})
             },
             .severity = Biz::Slicing::WarningSeverity::HIGH
         });

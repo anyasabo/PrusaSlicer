@@ -422,7 +422,8 @@ namespace {
 
 // Processes the boxes with complete_objects and returns the warnings of Print::process().
 std::vector<Biz::Slicing::Warning> process_sequential(const std::vector<Placement>& placements,
-                                                      const std::function<void(TestConfig&)>& tweak)
+                                                      const std::function<void(TestConfig&)>& tweak,
+                                                      const std::function<void(Domain::Model&)>& tweak_model = {})
 {
     TestConfig config;
     config.print.items.opt("complete_objects").set(true);
@@ -435,6 +436,8 @@ std::vector<Biz::Slicing::Warning> process_sequential(const std::vector<Placemen
 
     Domain::Model model;
     add_boxes(model, placements);
+    if (tweak_model)
+        tweak_model(model);
     Print print;
     std::vector<Biz::Slicing::Warning> warnings;
     print.append_warning_callback = [&warnings](Biz::Slicing::Warning w) { warnings.push_back(std::move(w)); };
@@ -683,4 +686,39 @@ TEST_CASE("Sequential print: the arrange does not place an object larger than th
     const std::vector<SeqArrange::Plate> plates = seq_arrange.process([](int) {});
     REQUIRE(plates.size() == 1);
     CHECK(plates.front().size() == 1);
+}
+
+TEST_CASE("Sequential print: supports outside the object are in the check", "[SequentialPrint]")
+{
+    // Clearance fallback (radius 20, height 20): above 1 mm, the toolhead is a square of 40 x 40 mm. Object "arm" prints
+    // first: a post of 10 x 10 x 18 mm with an arm 40 mm long in +X at 13 to 18 mm. The arm needs supports from the bed.
+    // Object "low" prints second, 21 mm from the end of the arm in X: the toolhead does not reach the arm. Grid
+    // supports reach some mm outside the arm (measured: 2 to 5 mm), so with supports the toolhead hits them.
+    const std::vector<Placement> placements{{"low", 100. + 45. + 21. + 10., 100., 5.}};
+    const auto add_arm = [](Domain::Model& model) {
+        Domain::ModelObject* arm = model.add_object();
+        arm->name = "arm";
+        // mesh() moves the cube (0 to 20 mm), then scales it.
+        // The object is lower than the gantry (20 mm).
+        add_volume(arm, mesh(TestMesh::cube_20x20x20, Vec3d(-10., -10., 0.), Vec3d(0.5, 0.5, 0.9)));  // X, Y -5 to 5, Z 0 to 18
+        add_volume(arm, mesh(TestMesh::cube_20x20x20, Vec3d(2.5, -10., 52.), Vec3d(2., 0.5, 0.25)));  // X 5 to 45, Z 13 to 18
+        arm->add_instance()->set_offset(Vec3d(100., 100., 0.));
+        // The arm prints first.
+        std::rotate(model.objects.begin(), model.objects.end() - 1, model.objects.end());
+    };
+    using Biz::Slicing::WarningCode;
+
+    SECTION("Without supports, no collision")
+    {
+        CHECK(! has_warning(process_sequential(placements, [](TestConfig&) {}, add_arm), WarningCode::SequentialCollision));
+    }
+
+    SECTION("With grid supports, the toolhead hits the supports")
+    {
+        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+            c.print.items.opt("support_material").set(Domain::SupportMode::Everywhere);
+            c.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsGrid);
+        }, add_arm);
+        CHECK(has_warning(warnings, WarningCode::SequentialCollision));
+    }
 }

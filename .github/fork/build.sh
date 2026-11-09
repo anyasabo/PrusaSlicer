@@ -18,7 +18,7 @@
 #   JOBS          parallel jobs (default: all CPUs)
 #   DEPS_PREFIX   the CMAKE_PREFIX_PATH of the dependencies. Default: deps/build/destdir/usr/local (doc/Build.md).
 #                 A ';' list is allowed, for prebuilt dependencies (for example the devspace cache).
-#   FORK_SUFFIX   the version suffix (default: from the git tag v<version>-<suffix>, else "anya-<commit>")
+#   FORK_SUFFIX   the version suffix (default: from the git tag v<version>-<suffix>, else "anya-dev")
 #   CMAKE_ARGS    more arguments for the configure of the app (optional)
 # A compiler launcher (ccache) comes from the environment: CMAKE_C_COMPILER_LAUNCHER, CMAKE_CXX_COMPILER_LAUNCHER.
 set -euo pipefail
@@ -46,7 +46,9 @@ fork_suffix() {
     tag=$(git describe --tags --exact-match 2>/dev/null || true)
     case "$tag" in
         v*-anya.*) echo "${tag##*-}" ;;
-        *) echo "anya-$(git rev-parse --short=10 HEAD)" ;;
+        # Not the commit: the build ID is in Slic3r/Version.hpp, which libslic3r.h includes (about 150 files). A new
+        # value on each commit makes all these files miss ccache. The package names get the commit instead.
+        *) echo "anya-dev" ;;
     esac
 }
 

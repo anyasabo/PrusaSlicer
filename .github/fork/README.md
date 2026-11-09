@@ -29,4 +29,5 @@ With prebuilt dependencies: `DEPS_PREFIX="/path/a;/path/b" .github/fork/build.sh
 3. A local build can also upload: `.github/fork/upload-release.sh v3.0.0-alpha14-anya.1` (it uses `gh`).
 
 The version is upstream `SLIC3R_VERSION`, with the suffix after `+` in the build ID (see `version.inc`). The suffix
-comes from the tag: `anya.1`. A build without a tag gets `anya-<commit>`.
+comes from the tag: `anya.1`. A build without a tag gets `anya-dev` (the package names add the commit). The build ID
+is in a header that about 150 files include, so a value that changes on each commit would make them miss ccache.

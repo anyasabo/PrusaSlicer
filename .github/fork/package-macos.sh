@@ -13,6 +13,8 @@ dist=build/dist
 out=build/package
 version=$(sed -n 's/^set(SLIC3R_VERSION "\(.*\)")/\1/p' version.inc)
 suffix=$(cat "$dist/FORK_SUFFIX")
+# A build without a release tag: the commit goes into the file names (not into the build ID, see build.sh).
+[ "$suffix" = anya-dev ] && suffix="anya-dev-$(git rev-parse --short=10 HEAD)"
 arch=$(uname -m)
 name="PrusaSlicer-${version}+${suffix}-macos-${arch}"
 

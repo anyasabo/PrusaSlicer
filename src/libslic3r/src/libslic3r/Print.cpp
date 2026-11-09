@@ -1532,13 +1532,22 @@ void Print::process()
     // In a sequential print, the skirt prints before all objects (a draft shield to the height of the highest
     // object). The extruder of each object hits a skirt that is higher than the lowest part of the toolhead.
     if (config().get<bool>("complete_objects") && this->has_skirt() && ! m_objects.empty()) {
+        // The G-code prints the skirt at the print_z of the raft layers and of the object layers
+        // (make_skirt_loops_per_extruder_other_layers() in GCode.cpp). Thus a raft layer counts as a skirt layer.
         double skirt_height_z = 0.;
         for (const PrintObject* object : m_objects) {
-            if (object->layer_count() == 0)
+            std::vector<double> zs;
+            const size_t raft_layers = std::min(object->slicing_parameters().raft_layers(), object->support_layers().size());
+            for (size_t i = 0; i < raft_layers; ++i)
+                zs.push_back(object->support_layers()[i]->print_z);
+            for (const Layer* layer : object->layers())
+                zs.push_back(layer->print_z);
+            if (zs.empty())
                 continue;
+            std::sort(zs.begin(), zs.end());
             const size_t skirt_layers = this->has_infinite_skirt() ?
-                object->layer_count() : std::min(size_t(m_config.get<int>("skirt_height")), object->layer_count());
-            skirt_height_z = std::max(skirt_height_z, object->layers()[skirt_layers - 1]->print_z);
+                zs.size() : std::min(size_t(m_config.get<int>("skirt_height")), zs.size());
+            skirt_height_z = std::max(skirt_height_z, zs[skirt_layers - 1]);
         }
         // Without gantry data, the real clearance is not known (0). A draft shield is as high as the objects,
         // so it is a collision for each toolhead. A lower skirt is then not reported.
@@ -1556,6 +1565,9 @@ void Print::process()
 
     m_sequential_collision_detected = config().get<bool>("complete_objects") ? check_seq_conflict(model(), config(), seq_rafts) : std::nullopt;
     if (m_sequential_collision_detected) {
+        // The CLI does not show the warnings of the slicing. The log gives the result also there.
+        SPDLOG_WARN("Sequential print: the extruder will crash into {} while printing {}.",
+                    m_sequential_collision_detected->first, m_sequential_collision_detected->second);
         this->append_warning_callback(Biz::Slicing::Warning{
             .code = Biz::Slicing::WarningCode::SequentialCollision,
             .item_keys = {"complete_objects"},

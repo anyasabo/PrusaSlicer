@@ -713,7 +713,7 @@ void schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -732,7 +732,7 @@ void schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {		
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));
@@ -1130,7 +1130,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver_
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -1149,7 +1149,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver_
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));
@@ -1469,7 +1469,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    bool split = false;
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
-		if (solvable_objects[i].lepox_to_next && !is_scheduled(i + 1, decided_polygons))
+		if (solvable_objects[decided_polygons[i]].lepox_to_next && !is_scheduled(decided_polygons[i] + 1, decided_polygons))
 		{
 		    split = true;
 		    break;
@@ -1488,7 +1488,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    {
 		trans_bed_lepox = false;
 	    }
-	    std::map<double, int> scheduled_polygons;
+	    std::multimap<double, int> scheduled_polygons; // two objects can have the same time
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {
 		scheduled_polygons.insert(std::pair<double, int>(times_T[decided_polygons[i]].as_double(), decided_polygons[i]));

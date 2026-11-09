@@ -10340,7 +10340,8 @@ void augment_TemporalSpread(const SolverConfiguration &solver_configuration,
 			    std::vector<Rational>     &dec_values_T,
 			    const std::vector<int>    &decided_polygons)
 {
-    std::map<double, int, std::less<double>> sorted_polygons;
+    // A multimap: two objects can have the same time, and each must get a new time.
+    std::multimap<double, int, std::less<double>> sorted_polygons;
 
     #ifdef DEBUG
     {
@@ -10354,7 +10355,7 @@ void augment_TemporalSpread(const SolverConfiguration &solver_configuration,
 	
     for (unsigned int i = 0; i < decided_polygons.size(); ++i)
     {
-	sorted_polygons[dec_values_T[decided_polygons[i]].as_double()] = decided_polygons[i];
+	sorted_polygons.emplace(dec_values_T[decided_polygons[i]].as_double(), decided_polygons[i]);
     }
     
     int time = SEQ_GROUND_PRESENCE_TIME + 2 * solver_configuration.temporal_spread * solver_configuration.object_group_size;

@@ -9,6 +9,11 @@ printer. It checks each result and writes one JSON line for each case and printe
   with three extra lines: `#NAME`, `#PRINTERS` and `#GLUED`. The bench source tells about the format.
 - `generate.py`: makes the `*.txt` files. The output is the same each time (fixed seeds).
 - `compare.py`: shows a result file as a table, or compares a result file with a baseline.
+- `from_3mf.py`: makes cases from the plates of a 3MF project (PrusaSlicer 2.x and 3.x, or a plain 3MF). Each
+  plate with two or more instances gives one case for each printer. The polygons are the convex hulls of the
+  meshes above the slice heights of the printer, as in the slicer. For the printer of the project, the case also
+  has the plate as it was (`#ORIGINAL`), and the bench checks it. Example:
+  `uv run from_3mf.py project.3mf --out . --printers all`.
 - `baseline.jsonl`: the results of 2026-11-08 (z3 5.3.3, `--rlimit 40000000 --repeat 3`, GCC 13
   RelWithDebInfo, Ryzen 7 8700G). The times are for this machine only. On another machine, make a new
   baseline before a change, and compare with it.

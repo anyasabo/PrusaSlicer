@@ -8,6 +8,8 @@
 //   #NAME <name>             the case name (default: the file name)
 //   #PRINTERS <model> ...    the printers of the case (default: all printers of the bench)
 //   #GLUED                   the object above this line is glued to the next object (instances of one object)
+//   #ORIGINAL <id> <x> <y>   the position (mm) of the object in a real plate, in print order. The bench checks
+//                            that plate too and writes the result to "original".
 // An object can have polygons at the heights of one printer (an export from the slicer), or only a polygon at
 // height 0 (a footprint). The bench extrudes a footprint to TOTAL_HEIGHT for each printer. A case with an
 // object with other heights is skipped for that printer.
@@ -117,6 +119,7 @@ struct Case
     std::string file;
     std::vector<std::string> printers;
     std::vector<ObjectToPrint> objects;
+    ScheduledPlate original;  // "#ORIGINAL id x y" lines (mm): the plate as it was printed, in print order
 };
 
 Case read_case(const fs::path& path)
@@ -139,6 +142,12 @@ Case read_case(const fs::path& path)
             std::string p;
             while (ss >> p)
                 c.printers.push_back(p);
+        } else if (line.rfind("#ORIGINAL ", 0) == 0) {
+            std::istringstream ss(line.substr(10));
+            int id;
+            double x, y;
+            if (ss >> id >> x >> y)
+                c.original.scheduled_objects.emplace_back(id, scaled_mm(x), scaled_mm(y));
         } else if (line.rfind("#GLUED", 0) == 0)
             glued.push_back(objects - 1);
         else if (line.rfind("#", 0) == 0)
@@ -543,6 +552,12 @@ int main(int argc, char** argv)
                     why = "order solver failed on " + std::to_string(order_failures) + " of " + std::to_string(order_tests) + " plates";
                 }
             }
+            // The plate as it was printed (if the case has it): does it pass the check?
+            std::string original_check;
+            if (! c.original.scheduled_objects.empty()) {
+                const auto conflict = check_ScheduledObjectsForSequentialConflict(config, *printer, *objects, {c.original});
+                original_check = conflict ? "conflict " + std::to_string(conflict->first) + " " + std::to_string(conflict->second) : "ok";
+            }
             all_ok &= ok;
 
             std::ostringstream js;
@@ -559,7 +574,7 @@ int main(int argc, char** argv)
             js << "],\"wall_ms\":" << times[times.size() / 2] << ",\"wall_ms_min\":" << times.front()
                << ",\"checks\":" << r.stats.checks << ",\"sat\":" << r.stats.sat << ",\"unsat\":" << r.stats.unsat
                << ",\"unknown\":" << r.stats.unknown << ",\"rlimit\":\"" << rlimit << "\",\"decimation\":\"" << decimation << "\",\"max_refines\":" << config.max_refines
-               << ",\"group_size\":" << config.object_group_size << ",\"order_tests\":" << order_tests << ",\"repeat\":" << repeat
+               << ",\"group_size\":" << config.object_group_size << ",\"order_tests\":" << order_tests << ",\"original\":\"" << original_check << "\"" << ",\"repeat\":" << repeat
                << ",\"deterministic\":" << (deterministic ? "true" : "false") << ",\"layout\":\"" << layout_key(r.plates) << "\"}";
             std::cout << js.str() << std::endl;
         }

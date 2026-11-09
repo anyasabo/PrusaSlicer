@@ -18,9 +18,11 @@ The settings and profiles are the same as upstream 3.0 alpha. This build uses th
 
 - **macOS (Apple silicon), macOS 13.3 or newer:** open the dmg and move PrusaSlicer to Applications. The app has no Apple signature. For
   the first start, right-click the app and select Open. Or run `xattr -dr com.apple.quarantine /Applications/PrusaSlicer.app`.
+- **Linux:** the build is made on Ubuntu 26.04, so it needs Ubuntu 26.04 or a distribution with the same or a newer
+  glibc. On an older system it does not start.
 - **Linux, AppImage:** `chmod +x PrusaSlicer-*.AppImage`, then start it.
 - **Linux, tar.gz:** extract it and start `bin/prusa-slicer`. It needs GTK 3 and WebKitGTK 4.1 from your system
-  (Ubuntu and Debian: `libgtk-3-0t64 libwebkit2gtk-4.1-0`). It needs glibc 2.39 or newer (Ubuntu 24.04, Fedora 40).
+  (Ubuntu: `libgtk-3-0t64 libwebkit2gtk-4.1-0`).
 
 ## Problems
 

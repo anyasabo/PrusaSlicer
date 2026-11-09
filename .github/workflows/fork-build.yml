@@ -8,6 +8,8 @@
 # Caches:
 # - deps: the dependency prefix (deps/build/destdir). The key has the hash of deps/ and the OS and SDK version. A hit
 #   skips doc/Build.md step 1 (more than one hour). It is saved right after the deps build, also if the app fails.
+#   A failed deps build is not saved: CMake runs the ExternalProject steps again without the full deps/build tree
+#   (tested: the stamp files are not enough, with Ninja and with Make), and the full tree is too large for a cache.
 # - ccache: the compiler cache of the app. A new entry each run, restored from the last one.
 #
 # The upstream workflows (build_osx.yml and others) call private Prusa workflows. They are disabled in the fork
@@ -34,6 +36,9 @@ env:
   CCACHE_MAXSIZE: 3G
   CMAKE_C_COMPILER_LAUNCHER: ccache
   CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  # The precompiled headers (SLIC3R_PCH) need these for ccache hits. On clang, build.sh also adds
+  # -Xclang -fno-pch-timestamp: without it, each file misses the cache.
+  CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
 
 jobs:
   build:

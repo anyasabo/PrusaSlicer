@@ -8,8 +8,9 @@
 #   all   deps, then app.
 #
 # Only these settings are added to doc/Build.md:
-#   CMAKE_BUILD_TYPE=Release, SLIC3R_BUILD_TESTS=OFF (a release build), CMAKE_INSTALL_PREFIX=build/dist,
-#   SLIC3R_FORK_SUFFIX (the version suffix, see version.inc).
+#   CMAKE_BUILD_TYPE=Release, SLIC3R_BUILD_TESTS=OFF and SLIC3R_RELEASE_DEBUG_SYMBOLS=OFF (a release build),
+#   CMAKE_INSTALL_PREFIX=build/dist, SLIC3R_FORK_SUFFIX (the version suffix, see version.inc),
+#   on macOS the deployment target 13.3 and -Xclang -fno-pch-timestamp (for ccache).
 #
 # Environment:
 #   JOBS          parallel jobs (default: all CPUs)
@@ -27,6 +28,12 @@ if [ -z "${JOBS:-}" ]; then
 fi
 # doc/Build.md, "Troubleshooting": the extraction of Boost can fail without a UTF-8 locale.
 export LC_ALL=C.UTF-8 LANG=C.UTF-8
+# macOS: z3 5.3.3 (deps/+z3) uses std::format with floating-point values. libc++ has std::to_chars for floating point
+# from macOS 13.3. Upstream uses 11.0 (cmake/modules/OSXDeploymentTarget.cmake), and then the deps build fails.
+# The dependencies and the app must use the same target.
+if [ "$(uname -s)" = Darwin ] && [ -z "${MACOSX_DEPLOYMENT_TARGET:-}" ]; then
+    export MACOSX_DEPLOYMENT_TARGET=13.3
+fi
 
 fork_suffix() {
     if [ -n "${FORK_SUFFIX:-}" ]; then
@@ -54,10 +61,16 @@ build_app() {
     local suffix
     suffix=$(fork_suffix)
     echo "== doc/Build.md step 2: PrusaSlicer (suffix $suffix, prefix $prefix)"
+    # The packages strip the binary, so the release build needs no debug symbols (SLIC3R_RELEASE_DEBUG_SYMBOLS adds
+    # -g on macOS). With clang, a precompiled header has a time stamp, and then ccache misses each file.
+    local flags=()
+    if [ "$(uname -s)" = Darwin ]; then
+        flags+=(-DCMAKE_CXX_FLAGS="-Xclang -fno-pch-timestamp" -DCMAKE_C_FLAGS="-Xclang -fno-pch-timestamp")
+    fi
     # shellcheck disable=SC2086
     cmake -S . -B build -DCMAKE_PREFIX_PATH="$prefix" \
-        -DCMAKE_BUILD_TYPE=Release -DSLIC3R_BUILD_TESTS=OFF \
-        -DCMAKE_INSTALL_PREFIX="$PWD/build/dist" -DSLIC3R_FORK_SUFFIX="$suffix" ${CMAKE_ARGS:-}
+        -DCMAKE_BUILD_TYPE=Release -DSLIC3R_BUILD_TESTS=OFF -DSLIC3R_RELEASE_DEBUG_SYMBOLS=OFF \
+        -DCMAKE_INSTALL_PREFIX="$PWD/build/dist" -DSLIC3R_FORK_SUFFIX="$suffix" "${flags[@]}" ${CMAKE_ARGS:-}
     cmake --build build -j "$JOBS"
     rm -rf build/dist
     cmake --install build

@@ -139,7 +139,10 @@ Sequential::PrinterGeometry get_printer_geometry(const PrintConfigView& config)
 	out.plate = bed_polygon;
 	for (const ExtruderSlice& slice : slices) {
 		(slice.shape_type == ShapeType::Convex ? out.convex_heights : out.box_heights).emplace(slice.height);
-		out.extruder_slices.emplace(slice.height, slice.polygons); // read_gantry_slices() rejects two slices at one height
+		// read_gantry_slices() rejects two slices at one height. The fallback has two at 1 mm if
+		// extruder_clearance_height is 1 mm: keep the polygons of both.
+		std::vector<Polygon>& polygons = out.extruder_slices[slice.height];
+		polygons.insert(polygons.end(), slice.polygons.begin(), slice.polygons.end());
 	}
 	return out;
 }
@@ -201,6 +204,16 @@ Sequential::ScheduledPlate get_plate(const Domain::Model& model)
 	return plate;
 }
 
+// The name of an instance in a message: the object name, and " (n)" if the object has more instances.
+std::string instance_name(const Domain::Model& model, int instance_id)
+{
+	for (const Domain::ModelObject* mo : model.objects)
+		for (size_t k = 0; k < mo->instances.size(); ++k)
+			if (int(mo->instances[k]->id().id) == instance_id)
+				return mo->instances.size() > 1 ? mo->name + " (" + std::to_string(k + 1) + ")" : mo->name;
+	return {};
+}
+
 } // namespace
 
 std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model& model, const PrintConfigView& config, const SeqRafts& rafts)
@@ -210,17 +223,21 @@ std::optional<std::vector<std::string>> find_seq_print_order(const Domain::Model
 		return std::nullopt;
 	Sequential::SolverConfiguration solver_config(printer_geometry);
 	std::vector<Sequential::ObjectToPrint> objects = get_objects_to_print(model, printer_geometry, rafts);
+	// The user can change the order of the objects, not of the instances inside an object, and the instances of
+	// an object print one after the other (sort_object_instances_by_model_order()). Thus each object is a group.
+	std::vector<int> groups;
+	for (size_t i = 0; i < model.objects.size(); ++i)
+		for (const Domain::ModelInstance* mi : model.objects[i]->instances)
+			if (mi->printable)
+				groups.push_back(int(i));
 	const std::optional<std::vector<int>> order =
-		Sequential::find_ObjectOrderForSequentialPrint(solver_config, printer_geometry, objects, get_plate(model));
+		Sequential::find_ObjectOrderForSequentialPrint(solver_config, printer_geometry, objects, get_plate(model), nullptr, groups);
 	if (! order)
 		return std::nullopt;
 
 	std::vector<std::string> names;
 	for (int id : *order)
-		for (const Domain::ModelObject* mo : model.objects)
-			for (size_t k = 0; k < mo->instances.size(); ++k)
-				if (int(mo->instances[k]->id().id) == id)
-					names.push_back(mo->instances.size() > 1 ? mo->name + " (" + std::to_string(k + 1) + ")" : mo->name);
+		names.push_back(instance_name(model, id));
 	return names;
 }
 
@@ -243,19 +260,14 @@ std::optional<std::pair<std::string, std::string>> check_seq_conflict(const Doma
 	if (! conflict)
 		return std::nullopt;
 
-	std::pair<std::string, std::string> names;
-	for (const Domain::ModelObject* mo : model.objects)
-		for (const Domain::ModelInstance* mi : mo->instances) {
-			if (int(mi->id().id) == conflict->first)
-				names.first = mo->name;
-			if (int(mi->id().id) == conflict->second)
-				names.second = mo->name;
-		}
-	return names;
+	return std::make_pair(instance_name(model, conflict->first), instance_name(model, conflict->second));
 }
 
 double seq_skirt_clearance(const PrintConfigView& config)
 {
+	// The fallback (extruder_clearance_radius and _height) does not know the real toolhead.
+	if (read_gantry_slices(config.hw_config().model).empty())
+		return 0.;
 	const Sequential::PrinterGeometry printer_geometry = get_printer_geometry(config);
 	double lowest = 0.;
 	for (const auto& [height, polygons] : printer_geometry.extruder_slices)

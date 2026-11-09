@@ -364,6 +364,9 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
 
     case WarningCode::SequentialSkirtCollision: {
         const auto& detail = std::get<Biz::Slicing::SequentialSkirtWarningPayload>(warning.payload);
+        if (detail.clearance <= 0.)
+            return _u8L("In sequential printing, the draft shield prints before all objects, and the extruder "
+                "will hit it. Turn off the draft shield.");
         // TRN {0} is the skirt height in mm, {1} is the height in mm that the extruder clears.
         return fmt::format(fmt::runtime(_u8L("In sequential printing, the skirt prints before all objects. "
             "It is {0:.2f} mm high, but the extruder clears only {1:.2f} mm, so it will hit the skirt. "

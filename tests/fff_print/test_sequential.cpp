@@ -394,9 +394,25 @@ TEST_CASE("Sequential print: an object above the ceiling clearance prints last",
         CHECK(! check({tall_first[1], tall_first[0]}, 1., 1., core_one).has_value());
     }
 
-    SECTION("Two objects above the ceiling clearance have no order")
+    SECTION("The solver prints the tall object last")
     {
-        CHECK(check({{"tree1", 50., 50., 110.}, {"tree2", 200., 150., 110.}}, 1., 1., core_one).has_value());
+        TestConfig config;
+        config.hw_config.model = core_one;
+        config.print.items.opt("complete_objects").set(true);
+        const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+        Domain::Model model;
+        add_boxes(model, tall_first);
+        const auto order = find_seq_print_order(model, view);
+        REQUIRE(order.has_value());
+        CHECK(*order == std::vector<std::string>{"small", "tree"});
+
+        SECTION("Two objects above the ceiling clearance have no order")
+        {
+            Domain::Model trees;
+            add_boxes(trees, {{"tree1", 50., 50., 110.}, {"tree2", 200., 150., 110.}});
+            CHECK(check_seq_conflict(trees, view).has_value());
+            CHECK(! find_seq_print_order(trees, view).has_value());
+        }
     }
 }
 
@@ -476,52 +492,83 @@ TEST_CASE("Sequential print: a raft lifts the object", "[SequentialPrint]")
 
 TEST_CASE("Sequential print: a high skirt is hit", "[SequentialPrint]")
 {
-    // The skirt prints before all objects. With the clearance fallback, the toolhead box starts 1 mm above the tip.
+    // The skirt prints before all objects. The lowest toolhead slice of the CORE One above the tip is at 2 mm.
+    struct ResourcesDirGuard
+    {
+        std::string old{resources_dir()};
+        ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
+        ~ResourcesDirGuard() { set_resources_dir(old); }
+    } resources_dir_guard;
     const std::vector<Placement> placements{{"a", 60., 100., 10.}, {"b", 160., 100., 10.}};
     using Biz::Slicing::WarningCode;
+    const auto core_one = [](TestConfig& c) { c.hw_config.model = Domain::Preset::HwModel{.model = "COREONE", .base_model = "COREONE"}; };
 
-    SECTION("The clearance of the fallback is 1 mm, of the CORE One 2 mm")
+    SECTION("The clearance of the CORE One is 2 mm. Without gantry data, it is not known")
     {
+        TestConfig fallback;
+        const PrintConfigView fallback_view{std::make_shared<const Domain::FullConfigFDM>(fallback.get_full_config())};
+        CHECK(seq_skirt_clearance(fallback_view) == 0.);
         TestConfig config;
+        core_one(config);
         const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
-        CHECK(seq_skirt_clearance(view) == Approx(1.));
-
-        struct ResourcesDirGuard
-        {
-            std::string old{resources_dir()};
-            ResourcesDirGuard() { set_resources_dir(std::string(TEST_DATA_DIR) + "/../../resources"); }
-            ~ResourcesDirGuard() { set_resources_dir(old); }
-        } resources_dir_guard;
-        TestConfig core_one;
-        core_one.hw_config.model = Domain::Preset::HwModel{.model = "COREONE", .base_model = "COREONE"};
-        const PrintConfigView core_one_view{std::make_shared<const Domain::FullConfigFDM>(core_one.get_full_config())};
-        CHECK(seq_skirt_clearance(core_one_view) == Approx(2.));
+        CHECK(seq_skirt_clearance(view) == Approx(2.));
     }
 
-    SECTION("A skirt of one layer is not hit")
+    SECTION("CORE One: a skirt of one layer is not hit")
     {
-        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+        const auto warnings = process_sequential(placements, [&](TestConfig& c) {
+            core_one(c);
             c.print.items.opt("skirts").set(1);
             c.print.items.opt("skirt_height").set(1);
         });
         CHECK(! has_warning(warnings, WarningCode::SequentialSkirtCollision));
     }
 
-    SECTION("A skirt of 10 layers (2 mm) is hit")
+    SECTION("CORE One: a skirt of 15 layers (3 mm) is hit")
     {
-        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+        const auto warnings = process_sequential(placements, [&](TestConfig& c) {
+            core_one(c);
             c.print.items.opt("skirts").set(1);
-            c.print.items.opt("skirt_height").set(10);
+            c.print.items.opt("skirt_height").set(15);
         });
         CHECK(has_warning(warnings, WarningCode::SequentialSkirtCollision));
     }
 
-    SECTION("A draft shield is hit")
+    SECTION("Without gantry data: a skirt of 15 layers is not reported, a draft shield is")
     {
-        const auto warnings = process_sequential(placements, [](TestConfig& c) {
+        CHECK(! has_warning(process_sequential(placements, [](TestConfig& c) {
+            c.print.items.opt("skirts").set(1);
+            c.print.items.opt("skirt_height").set(15);
+        }), WarningCode::SequentialSkirtCollision));
+        CHECK(has_warning(process_sequential(placements, [](TestConfig& c) {
             c.print.items.opt("skirts").set(1);
             c.print.items.opt("draft_shield").set(Domain::DraftShield::dsEnabled);
-        });
-        CHECK(has_warning(warnings, WarningCode::SequentialSkirtCollision));
+        }), WarningCode::SequentialSkirtCollision));
     }
+}
+
+TEST_CASE("Sequential print: the suggested order keeps the instances of an object together", "[SequentialPrint]")
+{
+    // Clearance fallback (radius 20, height 20). Object "pair" has two instances. The second instance is 25 mm
+    // from "low" in Y, 100 mm away in X, and 25 mm high: the gantry band of "low" hits it, so "low" must print
+    // first. The first instance of "pair" is far away. A per-instance order would be pair (1), low, pair (2),
+    // which the user cannot set. The order for whole objects is low, pair (1), pair (2).
+    TestConfig config;
+    config.print.items.opt("complete_objects").set(true);
+    config.printer.items.opt("extruder_clearance_radius").set(20.);
+    config.printer.items.opt("extruder_clearance_height").set(20.);
+    const PrintConfigView view{std::make_shared<const Domain::FullConfigFDM>(config.get_full_config())};
+
+    Domain::Model model;
+    Domain::ModelObject* pair = model.add_object();
+    pair->name = "pair";
+    add_volume(pair, mesh(TestMesh::cube_20x20x20, Vec3d(-10., -10., 0.), Vec3d(1., 1., 25. / 20.)));
+    pair->add_instance()->set_offset(Vec3d(60., 30., 0.));
+    pair->add_instance()->set_offset(Vec3d(60., 115., 0.));
+    add_boxes(model, {{"low", 160., 140., 5.}});
+
+    REQUIRE(check_seq_conflict(model, view).has_value());
+    const auto order = find_seq_print_order(model, view);
+    REQUIRE(order.has_value());
+    CHECK(*order == std::vector<std::string>{"low", "pair (1)", "pair (2)"});
 }

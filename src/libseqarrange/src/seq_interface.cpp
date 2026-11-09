@@ -355,7 +355,8 @@ std::optional<std::vector<int> > find_ObjectOrderForSequentialPrint(const Solver
 								    const PrinterGeometry            &printer_geometry,
 								    const std::vector<ObjectToPrint> &objects_to_print,
 								    const ScheduledPlate             &scheduled_plate,
-								    std::pair<int, int>              *blocking_pair)
+								    std::pair<int, int>              *blocking_pair,
+								    const std::vector<int>           &groups)
 {
     std::vector<Slic3r::Polygon> polygons;
     std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
@@ -384,84 +385,157 @@ std::optional<std::vector<int> > find_ObjectOrderForSequentialPrint(const Solver
 	return check_PointsOutsidePolygons(X, Y, T, P, U).has_value() || check_PolygonLineIntersections(X, Y, T, P, U).has_value();
     };
 
-    // before[b] holds the objects that must print before b.
-    std::vector<std::vector<int> > before(n);
-    std::vector<int> pending(n, 0);
-    for (int a = 0; a < n; ++a)
+    // The units of the sort: the groups, in the order of their first object. Each group keeps the given
+    // order of its objects (for example the instances of one model object, which print one after the other).
+    std::vector<int> group_of(n);
+    std::vector<std::vector<int> > members;
     {
-	for (int b = a + 1; b < n; ++b)
+	std::map<int, int> unit_of_group;
+	for (int i = 0; i < n; ++i)
 	{
-	    const bool a_then_b = conflict(a, b);
-	    const bool b_then_a = conflict(b, a);
-	    if (a_then_b && b_then_a)
+	    const int g = groups.empty() ? i : groups[i];
+	    auto [it, inserted] = unit_of_group.emplace(g, int(members.size()));
+	    if (inserted)
 	    {
-		if (blocking_pair != nullptr)
+		members.emplace_back();
+	    }
+	    group_of[i] = it->second;
+	    members[it->second].push_back(i);
+	}
+    }
+    const int m = int(members.size());
+
+    // Inside a group the order is fixed: it must work as it is.
+    for (const std::vector<int> &group : members)
+    {
+	for (size_t i = 0; i < group.size(); ++i)
+	{
+	    for (size_t j = i + 1; j < group.size(); ++j)
+	    {
+		if (conflict(group[i], group[j]))
 		{
-		    *blocking_pair = std::make_pair(objects[a].id, objects[b].id);
+		    if (blocking_pair != nullptr)
+		    {
+			*blocking_pair = std::make_pair(objects[group[i]].id, objects[group[j]].id);
+		    }
+		    return std::nullopt;
 		}
-		return std::nullopt;
-	    }
-	    if (a_then_b)
-	    {
-		before[a].push_back(b);  // b must print before a
-		++pending[a];
-	    }
-	    else if (b_then_a)
-	    {
-		before[b].push_back(a);  // a must print before b
-		++pending[b];
 	    }
 	}
     }
 
-    // Topological order. Of the objects that are free, take the one that is first in the given order.
-    std::vector<std::vector<int> > after(n);
-    for (int b = 0; b < n; ++b)
+    // Between two groups G and H: G before H fails if any object of G is hit by any object of H.
+    // before[h] holds the groups that must print before group h.
+    std::vector<std::vector<int> > before(m);
+    std::vector<int> pending(m, 0);
+    for (int g = 0; g < m; ++g)
     {
-	for (int a : before[b])
+	for (int h = g + 1; h < m; ++h)
 	{
-	    after[a].push_back(b);
-	}
-    }
-    std::set<int> free_objects;
-    for (int i = 0; i < n; ++i)
-    {
-	if (pending[i] == 0)
-	{
-	    free_objects.insert(i);
-	}
-    }
-    std::vector<int> order;
-    while (!free_objects.empty())
-    {
-	const int i = *free_objects.begin();
-	free_objects.erase(free_objects.begin());
-	order.push_back(objects[i].id);
-	for (int b : after[i])
-	{
-	    if (--pending[b] == 0)
+	    std::pair<int, int> g_then_h_hit{-1, -1}, h_then_g_hit{-1, -1};
+	    for (int a : members[g])
 	    {
-		free_objects.insert(b);
+		for (int b : members[h])
+		{
+		    if (g_then_h_hit.first < 0 && conflict(a, b))
+		    {
+			g_then_h_hit = std::make_pair(a, b);
+		    }
+		    if (h_then_g_hit.first < 0 && conflict(b, a))
+		    {
+			h_then_g_hit = std::make_pair(b, a);
+		    }
+		}
+	    }
+	    const bool g_then_h = g_then_h_hit.first >= 0;
+	    const bool h_then_g = h_then_g_hit.first >= 0;
+	    if (g_then_h && h_then_g)
+	    {
+		if (blocking_pair != nullptr)
+		{
+		    *blocking_pair = std::make_pair(objects[g_then_h_hit.first].id, objects[g_then_h_hit.second].id);
+		}
+		return std::nullopt;
+	    }
+	    if (g_then_h)
+	    {
+		before[g].push_back(h);  // h must print before g
+		++pending[g];
+	    }
+	    else if (h_then_g)
+	    {
+		before[h].push_back(g);  // g must print before h
+		++pending[h];
 	    }
 	}
     }
-    if (int(order.size()) != n)
+
+    // Topological order. Of the groups that are free, take the one that is first in the given order.
+    std::vector<std::vector<int> > after(m);
+    for (int h = 0; h < m; ++h)
     {
-	// A cycle of three or more objects. Report two objects of the cycle.
+	for (int g : before[h])
+	{
+	    after[g].push_back(h);
+	}
+    }
+    std::set<int> free_groups;
+    for (int g = 0; g < m; ++g)
+    {
+	if (pending[g] == 0)
+	{
+	    free_groups.insert(g);
+	}
+    }
+    std::vector<int> order;
+    int placed = 0;
+    while (!free_groups.empty())
+    {
+	const int g = *free_groups.begin();
+	free_groups.erase(free_groups.begin());
+	++placed;
+	for (int i : members[g])
+	{
+	    order.push_back(objects[i].id);
+	}
+	for (int h : after[g])
+	{
+	    if (--pending[h] == 0)
+	    {
+		free_groups.insert(h);
+	    }
+	}
+    }
+    if (placed != m)
+    {
+	// A cycle of three or more groups. Walk back from a waiting group along the waiting groups that must
+	// print before it, until a group repeats: that group is on a cycle. Report the first objects of two
+	// groups of the cycle.
 	if (blocking_pair != nullptr)
 	{
-	    for (int i = 0; i < n; ++i)
+	    int g = 0;
+	    while (pending[g] == 0)
 	    {
-		if (pending[i] > 0)
+		++g;
+	    }
+	    std::vector<bool> seen(m, false);
+	    while (!seen[g])
+	    {
+		seen[g] = true;
+		for (int f : before[g])
 		{
-		    for (int a : before[i])
+		    if (pending[f] > 0)
 		    {
-			if (pending[a] > 0)
-			{
-			    *blocking_pair = std::make_pair(objects[a].id, objects[i].id);
-			    break;
-			}
+			g = f;
+			break;
 		    }
+		}
+	    }
+	    for (int f : before[g])
+	    {
+		if (pending[f] > 0)
+		{
+		    *blocking_pair = std::make_pair(objects[members[f].front()].id, objects[members[g].front()].id);
 		    break;
 		}
 	    }

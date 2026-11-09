@@ -1322,7 +1322,8 @@ TEST_CASE("Interface test: print order for fixed positions", "[Sequential Arrang
 
     SECTION("Objects that hit each other in both orders have no order")
     {
-	const ScheduledPlate plate = plate_of({{1, 100, 100}, {2, 112, 100}});
+	// 2 mm apart in X: the 10 x 10 mm nozzle block of each one reaches the other.
+	const ScheduledPlate plate = plate_of({{1, 100, 100}, {2, 122, 100}});
 	std::pair<int, int> blocking{0, 0};
 	const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, plate, &blocking);
 	CHECK(! order.has_value());
@@ -1335,8 +1336,44 @@ TEST_CASE("Interface test: print order for fixed positions", "[Sequential Arrang
 	const ScheduledPlate given = plate_of({{4, 220, 100}, {2, 60, 105}, {1, 60, 70}, {3, 60, 140}});
 	const auto order = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given);
 	REQUIRE(order.has_value());
-	REQUIRE(order->size() == 4);
-	CHECK(order->front() == 4);
+	// The slice polygons are turned 180 degrees: the polygon to -Y 40 mm is a toolhead that reaches 40 mm to +Y.
+	// Thus an earlier object must not be at +Y of a later one, and the row prints from -Y to +Y. Object 4 is free
+	// and first in the given order.
+	CHECK(*order == std::vector<int>{4, 1, 2, 3});
 	CHECK(! check(reorder(given, *order)).has_value());
+    }
+
+    SECTION("Groups print as one, in their given order")
+    {
+	// Objects 1 and 2 are one group (instances of one object), object 3 is another. 2 is at +Y of 3, so 3 must
+	// print before 2.
+	const ScheduledPlate given = plate_of({{1, 220, 100}, {2, 60, 105}, {3, 60, 70}});
+	const auto per_object = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given);
+	REQUIRE(per_object.has_value());
+	CHECK(*per_object == std::vector<int>{1, 3, 2});
+	const auto grouped = find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, nullptr, {0, 0, 1});
+	REQUIRE(grouped.has_value());
+	CHECK(*grouped == std::vector<int>{3, 1, 2});
+	CHECK(! check(reorder(given, *grouped)).has_value());
+    }
+
+    SECTION("A group whose given order does not work has no order")
+    {
+	// 3 must print before 2 (2 is at +Y of 3), so the group (2, 3) in this order fails.
+	const ScheduledPlate given = plate_of({{2, 60, 105}, {3, 60, 70}});
+	std::pair<int, int> blocking{0, 0};
+	CHECK(! find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, &blocking, {7, 7}).has_value());
+	CHECK(blocking == std::pair<int, int>{2, 3});
+    }
+
+    SECTION("Two groups that block each other report two objects")
+    {
+	// Objects 1, 2, 3 in a row in Y (the row must print 1, 2, 3). Groups {1, 3} and {2}: 1 must print before 2,
+	// and 2 before 3, so neither group can print first.
+	const ScheduledPlate given = plate_of({{1, 60, 70}, {2, 60, 105}, {3, 60, 140}});
+	std::pair<int, int> blocking{0, 0};
+	CHECK(! find_ObjectOrderForSequentialPrint(solver_configuration, printer_geometry, objects, given, &blocking, {0, 1, 0}).has_value());
+	CHECK(blocking.first != 0);
+	CHECK(blocking.second != 0);
     }
 }

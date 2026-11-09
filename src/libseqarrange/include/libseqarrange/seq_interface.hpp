@@ -174,11 +174,17 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
     
 /*
   Finds a print order for the objects of one plate at their given positions, so that the extruder never hits
-  a printed object. Of the orders that work, the order is as near to the order of scheduled_plate as
-  possible: an object moves only to print after the objects that must print before it.
+  a printed object.
 
-  Returns the object ids in print order. Returns nothing if no order works: then two objects hit each other
-  in both orders (or a cycle of objects blocks each other), and blocking_pair (if given) gets two of them.
+  groups (optional) gives a group id for each object of scheduled_plate, in the same order. The objects of a
+  group print one after the other, in their given order (for example the instances of one model object).
+  Without groups, each object is a group. Of the orders that work, the function returns the first in the
+  lexicographic order of the groups' places in scheduled_plate: at each step, the free group that comes
+  first in the given order prints next.
+
+  Returns the object ids in print order. Returns nothing if no order works: two objects (or groups) hit
+  each other in both orders, two objects of one group hit each other in their given order, or a cycle of
+  groups blocks each other. Then blocking_pair (if given) gets two of the objects.
 
   Note: The function does not change the positions and does not use z3.
 */
@@ -186,7 +192,8 @@ std::optional<std::vector<int> > find_ObjectOrderForSequentialPrint(const Solver
 								    const PrinterGeometry            &printer_geometry,
 								    const std::vector<ObjectToPrint> &objects_to_print,
 								    const ScheduledPlate             &scheduled_plate,
-								    std::pair<int, int>              *blocking_pair = nullptr);
+								    std::pair<int, int>              *blocking_pair = nullptr,
+								    const std::vector<int>           &groups = {});
 
     
 /*----------------------------------------------------------------*/

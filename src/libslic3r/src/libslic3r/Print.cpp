@@ -1540,8 +1540,10 @@ void Print::process()
                 object->layer_count() : std::min(size_t(m_config.get<int>("skirt_height")), object->layer_count());
             skirt_height_z = std::max(skirt_height_z, object->layers()[skirt_layers - 1]->print_z);
         }
+        // Without gantry data, the real clearance is not known (0). A draft shield is as high as the objects,
+        // so it is a collision for each toolhead. A lower skirt is then not reported.
         const double clearance = seq_skirt_clearance(config());
-        if (clearance > 0. && skirt_height_z > clearance) {
+        if ((clearance > 0. && skirt_height_z > clearance) || (clearance == 0. && this->has_infinite_skirt())) {
             this->append_warning_callback(Biz::Slicing::Warning{
                 .code = Biz::Slicing::WarningCode::SequentialSkirtCollision,
                 .item_keys = {"skirt_height", "draft_shield"},

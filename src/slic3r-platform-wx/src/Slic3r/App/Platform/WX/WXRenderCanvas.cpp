@@ -2,6 +2,7 @@
 #include "fmt/ostream.h"
 
 #include <iostream>
+#include <utility>
 
 #include <wx/frame.h>
 #include <wx/dcclient.h>
@@ -259,25 +260,29 @@ static wxGLAttributes create_wxglattributes()
     // port missing settings from OpenGLManager::create_wxglcanvas
     //
 
-    wxGLAttributes ret;
-    ret.PlatformDefaults()
-        .DoubleBuffer()
-        .RGBA()
-        .MinRGBA(8, 8, 8, 8)
-        .Depth(24)
-        .SampleBuffers(1)
-        .Samplers(4)
+    // The first set of attributes that the display supports. Without multisampling (for example a virtual machine,
+    // a remote desktop or Xvfb), the canvas is not smooth, but the application starts. 2.x had the same fallback
+    // (OpenGLManager::create_wxglcanvas). With an empty set, the canvas cannot be made.
+    const auto make = [](bool multisample, int alpha) {
+        wxGLAttributes attributes;
+        attributes.PlatformDefaults().DoubleBuffer().RGBA().MinRGBA(8, 8, 8, alpha).Depth(24);
+        if (multisample)
+            attributes.SampleBuffers(1).Samplers(4);
 #ifdef __APPLE__
         // on MAC the method RGBA() has no effect
-        .SetNeedsARB(true);
-#else
-        ;
+        attributes.SetNeedsARB(true);
 #endif // __APPLE__
-    ret.EndList();
-
-    DEBUG_ASSERT(wxGLCanvas::IsDisplaySupported(ret));
-    if (!wxGLCanvas::IsDisplaySupported(ret))
-        ret.Reset();
+        attributes.EndList();
+        return attributes;
+    };
+    for (const auto& [multisample, alpha] : {std::pair{true, 8}, std::pair{false, 8}, std::pair{false, 0}}) {
+        wxGLAttributes attributes = make(multisample, alpha);
+        if (wxGLCanvas::IsDisplaySupported(attributes))
+            return attributes;
+    }
+    DEBUG_ASSERT(false);
+    wxGLAttributes ret;
+    ret.Reset();
     return ret;
 }
 

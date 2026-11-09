@@ -10,7 +10,9 @@
 # Only these settings are added to doc/Build.md:
 #   CMAKE_BUILD_TYPE=Release, SLIC3R_BUILD_TESTS=OFF and SLIC3R_RELEASE_DEBUG_SYMBOLS=OFF (a release build),
 #   CMAKE_INSTALL_PREFIX=build/dist, SLIC3R_FORK_SUFFIX (the version suffix, see version.inc),
-#   on macOS the deployment target 13.3 and -Xclang -fno-pch-timestamp (for ccache).
+#   on macOS the deployment target 13.3 and -Xclang -fno-pch-timestamp (for ccache), and with clang the ThinLTO cache
+#   of the linker (and lld on Linux).
+# The compiler comes from the environment (CC, CXX), as for a local user. CI uses the latest LLVM (clang-23 on Linux).
 #
 # Environment:
 #   JOBS          parallel jobs (default: all CPUs)
@@ -66,6 +68,20 @@ build_app() {
     local flags=()
     if [ "$(uname -s)" = Darwin ]; then
         flags+=(-DCMAKE_CXX_FLAGS="-Xclang -fno-pch-timestamp" -DCMAKE_C_FLAGS="-Xclang -fno-pch-timestamp")
+    fi
+    # Release uses LTO (CMakeLists.txt, CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE). With clang, CMake uses ThinLTO, and
+    # the linker can keep a cache of the ThinLTO code generation: a small change then links much faster. ld64 (macOS)
+    # and lld (Linux) have such a cache. LTO_CACHE_DIR sets its place (default build/lto-cache, CI caches it).
+    local lto_cache=${LTO_CACHE_DIR:-$PWD/build/lto-cache}
+    local cxx=${CXX:-c++}
+    if [ "$(uname -s)" = Darwin ]; then
+        flags+=(-DCMAKE_EXE_LINKER_FLAGS="-Wl,-cache_path_lto,$lto_cache"
+                -DCMAKE_MODULE_LINKER_FLAGS="-Wl,-cache_path_lto,$lto_cache")
+    elif "$cxx" --version 2>/dev/null | grep -q clang; then
+        flags+=(-DCMAKE_LINKER_TYPE=LLD
+                -DCMAKE_EXE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache"
+                -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache"
+                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache")
     fi
     # shellcheck disable=SC2086
     cmake -S . -B build -DCMAKE_PREFIX_PATH="$prefix" \

@@ -37,8 +37,21 @@ const int GREEDY_ORDERS = 4;
 // object P, the polygon of N must not intersect an unreachable zone U of P (this is the check of
 // check_ScheduledObjectsForSequentialConflict(): the zones of an object are where later objects cannot be). Thus the
 // reference point of N must be outside U ⊕ (−N), moved to the position of P. All polygons are convex, so each sum is
-// the convex hull of the sums of the vertices. The object goes to the corner of the free region that the preference selects. The polygons are in solver units (0.1 mm), as in
-// the check.
+// the convex hull of the sums of the vertices. The object goes to the corner of the free region that the preference
+// selects. The polygons are in solver units (0.1 mm), as in the check.
+//
+// Invariants (the result is correct if these are true):
+// 1. A new object is always printed after all placed objects of its plate. Thus only the zones of the placed objects
+//    apply to it, and the zones of the new object do not apply to the placed objects.
+// 2. The polygon and the zones are the ones of the check: prepare_ExtruderPolygons() and prepare_ObjectPolygons().
+//    If the check changes its shapes, this file must use the same shapes.
+// 3. The polygons are convex. If a zone is not convex, the convex hull of the sums is larger than the true sum: the
+//    result stays correct, but the packing is worse.
+// 4. The margin (GREEDY_MARGIN) covers the rounding of the check. It was measured, not proved.
+// 5. The bed limit uses the exact footprint (the box of pgns_at_height[0]), not the decimated polygon: the decimated
+//    polygon can be smaller.
+// The caller checks each result with check_ScheduledObjectsForSequentialConflict(). Thus an error here gives a worse
+// layout or a fallback to z3, not a collision.
 //
 // The order: the units (an object, or the glued instances of one object) by height, the lowest first. A unit that does
 // not fit waits for the next plate, and the next units are tried. Four corner preferences are tried, and the result

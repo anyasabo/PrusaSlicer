@@ -3,7 +3,7 @@ slic3r_remap_configs("z3::libz3" RelWithDebInfo Release)
 
 
 
-add_library(libseqarrange STATIC src/seq_interface.cpp src/seq_preprocess.cpp src/seq_sequential.cpp src/seq_utilities.cpp)
+add_library(libseqarrange STATIC src/seq_interface.cpp src/seq_greedy.cpp src/seq_preprocess.cpp src/seq_sequential.cpp src/seq_utilities.cpp)
 set_target_properties(libseqarrange PROPERTIES PREFIX "")
 # seq_interface.hpp and the sources use libslic3r headers (Polygon, ConvexHull, ExPolygon) that libslic3r keeps in its
 # private src directory. Use the same path as tests/CMakeLists.txt (test_common).

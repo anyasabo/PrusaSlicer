@@ -227,6 +227,25 @@ void schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver
 					std::function<void(int)>          progress_callback = [](int progress){});
     
     
+/*
+  A greedy arrange without z3. The objects go on the plates one after the other. Each object goes to a corner of the
+  region where the extruder and the gantry of the earlier objects do not reach it (no-fit regions). The function tries
+  16 variants (4 orders of the objects, 4 corners) and returns the result with the fewest plates, then the most
+  objects on the first plate. It takes milliseconds.
+
+  The objects in the input order of a glued unit (glued_to_next) stay together and in order. If a unit does not fit on
+  an empty plate, the function throws std::runtime_error, or with split_glued the objects of the unit go on as single
+  objects. The function also throws if one object does not fit on an empty plate.
+
+  Measured with seqarrange_bench on 89 cases (2026-11-09): 145 plates against 163 for the solver with group size 8,
+  better in 20 cases and worse in 3. Each result passes check_ScheduledObjectsForSequentialConflict().
+*/
+std::vector<ScheduledPlate> schedule_ObjectsForSequentialPrintGreedy(const SolverConfiguration        &solver_configuration,
+								     const PrinterGeometry            &printer_geometry,
+								     const std::vector<ObjectToPrint> &objects_to_print,
+								     bool                              split_glued = false);
+
+    
 /*----------------------------------------------------------------*/
 /*
   The following interface is for more internal use.

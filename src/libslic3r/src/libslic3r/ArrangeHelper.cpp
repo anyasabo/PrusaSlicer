@@ -353,6 +353,17 @@ SeqRaft seq_config_raft(const Domain::ConfigView& config)
 	};
 }
 
+std::vector<SeqArrange::Plate> to_plates(const std::vector<Sequential::ScheduledPlate>& plates)
+{
+	std::vector<SeqArrange::Plate> out;
+	for (const Sequential::ScheduledPlate& plate : plates) {
+		SeqArrange::Plate& p = out.emplace_back();
+		for (const Sequential::ScheduledObject& o : plate.scheduled_objects)
+			p.push_back(SeqArrange::Placement{size_t(o.id), unscaled(o.x), unscaled(o.y)});
+	}
+	return out;
+}
+
 } // namespace
 
 SeqArrange::SeqArrange(const Domain::Model& model, const Domain::ConfigView& config, const std::vector<size_t>& instance_ids)
@@ -399,14 +410,45 @@ std::vector<SeqArrange::Plate> SeqArrange::process(const std::function<void(int)
 	if (empty())
 		return {};
 
-	// Two group sizes with a z3 resource limit. Measured with seqarrange_bench on 89 cases (2026-11-08): the
-	// better of the two results needs 15% fewer plates than group size 4 alone, in 4 s mean and 21 s for the
-	// largest case. The resource limit gives the same result on each machine. The wall-time timeout stays as a
-	// limit for a very slow machine.
-	struct Member { int group_size; int progress_from; int progress_to; };
-	const Member members[] = { {2, 0, 20}, {8, 20, 100} };
-
+	// Measured with seqarrange_bench on 89 cases (2026-11-09):
+	// - The greedy arrange (no z3) needs 145 plates in 1.5 s for all cases. The solver with group sizes 2 and 8
+	//   needs 155 plates in 362 s.
+	// - After the greedy arrange, the solver with group size 8 saves 3 more plates. It can save a plate only if the
+	//   greedy result has more than one plate: then it runs, 7 s mean and 18 s at most.
+	// - If the greedy arrange fails (a glued unit is larger than its arrange on one plate), the solver runs with
+	//   group sizes 2 and 8.
+	// The z3 resource limit gives the same result on each machine. The wall-time timeout stays as a limit for a
+	// very slow machine.
+	const auto first_count = [](const std::vector<Sequential::ScheduledPlate>& p) { return p.empty() ? size_t(0) : p.front().scheduled_objects.size(); };
 	std::vector<Sequential::ScheduledPlate> best;
+	const auto offer = [&](std::vector<Sequential::ScheduledPlate>&& plates, const Sequential::SolverConfiguration& solver_config, const char* name) {
+		// Each result must pass the geometric check (the solver had an error with this before, see the overflow fix
+		// in Rational).
+		if (Sequential::check_ScheduledObjectsForSequentialConflict(solver_config, m_data->printer_geometry, m_data->objects, plates)) {
+			SPDLOG_ERROR("Sequential arrange, {}: the result has a collision. It is not used.", name);
+			return;
+		}
+		if (best.empty() || plates.size() < best.size() || (plates.size() == best.size() && first_count(plates) > first_count(best)))
+			best = std::move(plates);
+	};
+
+	{
+		const Sequential::SolverConfiguration solver_config(m_data->printer_geometry);
+		try {
+			offer(Sequential::schedule_ObjectsForSequentialPrintGreedy(solver_config, m_data->printer_geometry, m_data->objects), solver_config, "greedy");
+		} catch (const std::runtime_error& e) {
+			SPDLOG_INFO("Sequential arrange, greedy: {}", e.what());
+		}
+	}
+	if (best.size() == 1) {
+		// One plate: the solver cannot do better.
+		progress(100);
+		return to_plates(best);
+	}
+	progress(5);
+
+	struct Member { int group_size; int progress_from; int progress_to; };
+	const std::vector<Member> members = best.empty() ? std::vector<Member>{{2, 5, 20}, {8, 20, 100}} : std::vector<Member>{{8, 5, 100}};
 	for (const Member& m : members) {
 		Sequential::SolverConfiguration solver_config(m_data->printer_geometry);
 		solver_config.set_ObjectGroupSize(m.group_size);
@@ -414,33 +456,16 @@ std::vector<SeqArrange::Plate> SeqArrange::process(const std::function<void(int)
 		const auto member_progress = [&](int p) {
 			progress(m.progress_from + (m.progress_to - m.progress_from) * std::clamp(p, 0, 100) / 100);
 		};
-		std::vector<Sequential::ScheduledPlate> plates;
 		try {
-			plates = Sequential::schedule_ObjectsForSequentialPrint(solver_config, m_data->printer_geometry, m_data->objects, member_progress);
+			offer(Sequential::schedule_ObjectsForSequentialPrint(solver_config, m_data->printer_geometry, m_data->objects, member_progress),
+			      solver_config, m.group_size == 2 ? "group size 2" : "group size 8");
 		} catch (const std::runtime_error& e) {
 			// The solver throws if it cannot place an object. Another member can still succeed.
 			SPDLOG_WARN("Sequential arrange, group size {}: {}", m.group_size, e.what());
-			continue;
 		}
-		// The solver result must pass the geometric check (the solver had an error with this before, see the
-		// overflow fix in Rational).
-		if (Sequential::check_ScheduledObjectsForSequentialConflict(solver_config, m_data->printer_geometry, m_data->objects, plates)) {
-			SPDLOG_ERROR("Sequential arrange, group size {}: the result has a collision. It is not used.", m.group_size);
-			continue;
-		}
-		const auto first_count = [](const std::vector<Sequential::ScheduledPlate>& p) { return p.empty() ? size_t(0) : p.front().scheduled_objects.size(); };
-		if (best.empty() || plates.size() < best.size() || (plates.size() == best.size() && first_count(plates) > first_count(best)))
-			best = std::move(plates);
 	}
 	progress(100);
-
-	std::vector<Plate> out;
-	for (const Sequential::ScheduledPlate& plate : best) {
-		Plate& p = out.emplace_back();
-		for (const Sequential::ScheduledObject& o : plate.scheduled_objects)
-			p.push_back(Placement{size_t(o.id), unscaled(o.x), unscaled(o.y)});
-	}
-	return out;
+	return to_plates(best);
 }
 
 } // namespace Slic3r

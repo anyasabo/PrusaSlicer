@@ -43,8 +43,9 @@ public:
     // The ids of the instances that are too large for the bed.
     const std::vector<size_t>& not_arranged() const { return m_not_arranged; }
 
-    // Runs the solver. It tries two settings and keeps the result with the fewest plates (then the most instances on
-    // the first plate). progress gets 0 to 100. To stop, throw an exception from progress: process() passes it on.
+    // Arranges. First the greedy arrange (milliseconds). If it needs more than one plate, the z3 solver tries to find
+    // fewer plates (some seconds). The result has the fewest plates, then the most instances on the first plate.
+    // progress gets 0 to 100. To stop, throw an exception from progress: process() passes it on.
     std::vector<Plate> process(const std::function<void(int)>& progress) const;
 
 private:

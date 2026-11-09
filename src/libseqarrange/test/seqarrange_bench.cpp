@@ -19,7 +19,9 @@
 //
 // Usage: seqarrange_bench --geometries geometries.json [--printers A,B] [--rlimit N] [--timeout MS]
 //                         [--repeat N] [--decimation low|high|none] [--max-refines N] [--group-size N]
-//                         [--no-fork] FILE_OR_DIR ...
+//                         [--no-fork] [--greedy] FILE_OR_DIR ...
+// --greedy: schedule_ObjectsForSequentialPrintGreedy(), a greedy placement with no-fit regions, without z3. A unit of
+// glued instances that does not fit on one plate is split, so that each case gives a result.
 // --max-refines, --group-size: SolverConfiguration::max_refines and object_group_size (defaults 2 and 4).
 // Each run is in a child process (see run()). --no-fork runs all in this process, for a profiler.
 // --decimation: the tolerance of the polygon decimation. "low" (0.15 mm) is the default of SolverConfiguration,
@@ -200,13 +202,16 @@ struct Result
     std::string error;
 };
 
+bool greedy_mode = false;
+
 Result run_here(const SolverConfiguration& config, const PrinterGeometry& printer, const std::vector<ObjectToPrint>& objects)
 {
     Result r;
     reset_SolverStatistics();
     const auto t0 = std::chrono::steady_clock::now();
     try {
-        r.plates = schedule_ObjectsForSequentialPrint(config, printer, objects);
+        r.plates = greedy_mode ? schedule_ObjectsForSequentialPrintGreedy(config, printer, objects, true)
+                               : schedule_ObjectsForSequentialPrint(config, printer, objects);
     } catch (const std::exception& e) {
         r.error = e.what();
     }
@@ -391,6 +396,8 @@ int main(int argc, char** argv)
             group_size = std::stoi(next());
         else if (a == "--no-fork")
             in_child = false;
+        else if (a == "--greedy")
+            greedy_mode = true;
         else if (a == "--decimation")
             decimation = next();
         else if (a == "--repeat")

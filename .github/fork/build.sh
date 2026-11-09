@@ -79,9 +79,9 @@ build_app() {
                 -DCMAKE_MODULE_LINKER_FLAGS="-Wl,-cache_path_lto,$lto_cache")
     elif "$cxx" --version 2>/dev/null | grep -q clang; then
         flags+=(-DCMAKE_LINKER_TYPE=LLD
-                -DCMAKE_EXE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache"
-                -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache"
-                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache")
+                -DCMAKE_EXE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache -Wl,--thinlto-cache-policy=cache_size_bytes=3g"
+                -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache -Wl,--thinlto-cache-policy=cache_size_bytes=3g"
+                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--thinlto-cache-dir=$lto_cache -Wl,--thinlto-cache-policy=cache_size_bytes=3g")
     fi
     # shellcheck disable=SC2086
     cmake -S . -B build -DCMAKE_PREFIX_PATH="$prefix" \

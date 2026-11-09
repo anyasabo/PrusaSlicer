@@ -172,6 +172,23 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
 										const std::vector<ScheduledPlate> &scheduled_plates);
 
     
+/*
+  Finds a print order for the objects of one plate at their given positions, so that the extruder never hits
+  a printed object. Of the orders that work, the order is as near to the order of scheduled_plate as
+  possible: an object moves only to print after the objects that must print before it.
+
+  Returns the object ids in print order. Returns nothing if no order works: then two objects hit each other
+  in both orders (or a cycle of objects blocks each other), and blocking_pair (if given) gets two of them.
+
+  Note: The function does not change the positions and does not use z3.
+*/
+std::optional<std::vector<int> > find_ObjectOrderForSequentialPrint(const SolverConfiguration        &solver_configuration,
+								    const PrinterGeometry            &printer_geometry,
+								    const std::vector<ObjectToPrint> &objects_to_print,
+								    const ScheduledPlate             &scheduled_plate,
+								    std::pair<int, int>              *blocking_pair = nullptr);
+
+    
 /*----------------------------------------------------------------*/
 /*
   This is the recommended interface for sequential scheduling/arranging.

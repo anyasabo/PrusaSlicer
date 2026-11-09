@@ -39,6 +39,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
@@ -514,6 +515,34 @@ int main(int argc, char** argv)
                     }
                 }
             }
+            // Order property test: each plate in a shuffled order (fixed seed) must get a working order back
+            // from find_ObjectOrderForSequentialPrint(). The arrange found one order, so one exists.
+            int order_tests = 0, order_failures = 0;
+            if (ok) {
+                std::mt19937 rng(12345);
+                for (const ScheduledPlate& p : r.plates) {
+                    if (p.scheduled_objects.size() < 2)
+                        continue;
+                    ScheduledPlate shuffled = p;
+                    std::shuffle(shuffled.scheduled_objects.begin(), shuffled.scheduled_objects.end(), rng);
+                    ++order_tests;
+                    const auto order = find_ObjectOrderForSequentialPrint(config, *printer, *objects, shuffled);
+                    bool good = order.has_value() && order->size() == shuffled.scheduled_objects.size();
+                    if (good) {
+                        ScheduledPlate reordered;
+                        for (int id : *order)
+                            for (const ScheduledObject& so : shuffled.scheduled_objects)
+                                if (so.id == id)
+                                    reordered.scheduled_objects.push_back(so);
+                        good = ! check_ScheduledObjectsForSequentialConflict(config, *printer, *objects, {reordered}).has_value();
+                    }
+                    order_failures += good ? 0 : 1;
+                }
+                if (order_failures > 0) {
+                    ok = false;
+                    why = "order solver failed on " + std::to_string(order_failures) + " of " + std::to_string(order_tests) + " plates";
+                }
+            }
             all_ok &= ok;
 
             std::ostringstream js;
@@ -530,7 +559,7 @@ int main(int argc, char** argv)
             js << "],\"wall_ms\":" << times[times.size() / 2] << ",\"wall_ms_min\":" << times.front()
                << ",\"checks\":" << r.stats.checks << ",\"sat\":" << r.stats.sat << ",\"unsat\":" << r.stats.unsat
                << ",\"unknown\":" << r.stats.unknown << ",\"rlimit\":\"" << rlimit << "\",\"decimation\":\"" << decimation << "\",\"max_refines\":" << config.max_refines
-               << ",\"group_size\":" << config.object_group_size << ",\"repeat\":" << repeat
+               << ",\"group_size\":" << config.object_group_size << ",\"order_tests\":" << order_tests << ",\"repeat\":" << repeat
                << ",\"deterministic\":" << (deterministic ? "true" : "false") << ",\"layout\":\"" << layout_key(r.plates) << "\"}";
             std::cout << js.str() << std::endl;
         }

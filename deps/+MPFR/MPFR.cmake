@@ -44,7 +44,7 @@ else ()
                 sh -c
                 "autoreconf -f -i && \
                  CFLAGS='${_gmp_ccflags}' \
-                 CXXFLAGS='${_gmp_ccflags}' \
+                 CXXFLAGS='${_gmp_cxxflags}' \
                  ./configure ${_cross_compile_arg} \
                              --prefix='${${PROJECT_NAME}_DEP_INSTALL_PREFIX}' \
                              --enable-shared=no \

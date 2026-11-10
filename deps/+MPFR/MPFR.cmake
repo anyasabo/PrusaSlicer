@@ -31,6 +31,8 @@ else ()
 
     message(STATUS "${PROJECT_NAME}_DEP_INSTALL_PREFIX=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}")
 
+    dep_build_jobs(_mpfr_jobs MPFR)
+
     ExternalProject_Add(dep_MPFR
         EXCLUDE_FROM_ALL ON
         #URL http://ftp.vim.org/ftp/gnu/mpfr/mpfr-3.1.6.tar.bz2 https://www.mpfr.org/mpfr-3.1.6/mpfr-3.1.6.tar.bz2  # mirrors are allowed
@@ -51,7 +53,7 @@ else ()
                              --enable-static=yes \
                              --with-gmp='${${PROJECT_NAME}_DEP_INSTALL_PREFIX}' \
                              ${_gmp_build_tgt}"
-        BUILD_COMMAND make -j
+        BUILD_COMMAND make -j${_mpfr_jobs}
         INSTALL_COMMAND make install
     )
 endif ()

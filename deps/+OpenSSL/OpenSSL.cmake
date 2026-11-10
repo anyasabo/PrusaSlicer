@@ -1,5 +1,4 @@
-include(ProcessorCount)
-ProcessorCount(NPROC)
+dep_build_jobs(NPROC OpenSSL)
 
 set(_conf_cmd "./config")
 set(_cross_arch "")

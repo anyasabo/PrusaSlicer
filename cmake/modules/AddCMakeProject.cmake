@@ -12,16 +12,10 @@ if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "Forcing CMAKE_BUILD_TYPE to Release as it was not specified.")
 endif ()
 
-# This is a wrapper function around ExternalProject_Add to simplify adding 
-# CMake based external projects. It will forward common build configuration from the parent
-# project and set up multithreaded build for various generators.
-# The function signiture is identical to that of ExternalProject_Add, except that the 
-# BUILD_COMMAND, INSTALL_COMMAND and INSTALL_DIR arguments are ignored. 
-# The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
-# generator is multi-config. Use this var to specify build type regardless of the generator. 
-function(add_cmake_project projectname)
-    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND;EMSCRIPTEN_PORT;EMSCRIPTEN_EXCLUDED" "CMAKE_ARGS;EMSCRIPTEN_CMAKE_ARGS" ${ARGN})
-
+# The number of parallel jobs for the build of one dependency: DEP_<projectname>_MAX_THREADS, else DEP_MAX_THREADS,
+# else the number of CPUs. Use it also for dependencies that do not use add_cmake_project (autotools, make): a plain
+# "make -j" has no limit.
+function(dep_build_jobs var projectname)
     set(_pcount ${DEP_${projectname}_MAX_THREADS})
 
     if (NOT _pcount)
@@ -35,6 +29,21 @@ function(add_cmake_project projectname)
     if (_pcount EQUAL 0)
         set(_pcount 1)
     endif ()
+
+    set(${var} ${_pcount} PARENT_SCOPE)
+endfunction()
+
+# This is a wrapper function around ExternalProject_Add to simplify adding 
+# CMake based external projects. It will forward common build configuration from the parent
+# project and set up multithreaded build for various generators.
+# The function signiture is identical to that of ExternalProject_Add, except that the 
+# BUILD_COMMAND, INSTALL_COMMAND and INSTALL_DIR arguments are ignored. 
+# The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
+# generator is multi-config. Use this var to specify build type regardless of the generator. 
+function(add_cmake_project projectname)
+    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND;EMSCRIPTEN_PORT;EMSCRIPTEN_EXCLUDED" "CMAKE_ARGS;EMSCRIPTEN_CMAKE_ARGS" ${ARGN})
+
+    dep_build_jobs(_pcount ${projectname})
 
     set(_build_j "-j${_pcount}")
     if (CMAKE_GENERATOR MATCHES "Visual Studio")

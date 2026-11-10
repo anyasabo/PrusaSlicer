@@ -2,6 +2,8 @@
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_install_dir ${${PROJECT_NAME}_DEP_INSTALL_PREFIX})
 
+    dep_build_jobs(_spnav_jobs libspnav)
+
     ExternalProject_Add(dep_libspnav
         URL https://github.com/FreeSpacenav/libspnav/releases/download/v1.2/libspnav-1.2.tar.gz
         URL_HASH SHA256=093747e7e03b232e08ff77f1ad7f48552c06ac5236316a5012db4269951c39db
@@ -9,7 +11,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         BUILD_IN_SOURCE ON
         # X11 support is not needed and the static library would require linking X11.
         CONFIGURE_COMMAND ./configure --prefix=${_install_dir} --disable-x11 --disable-debug
-        BUILD_COMMAND make -j "CC=${CMAKE_C_COMPILER}"
+        BUILD_COMMAND make -j${_spnav_jobs} "CC=${CMAKE_C_COMPILER}"
         # Its configure cannot disable the shared library, the dependencies are linked statically.
         INSTALL_COMMAND sh -c "make install && rm -f '${_install_dir}'/lib/libspnav.so*"
     )

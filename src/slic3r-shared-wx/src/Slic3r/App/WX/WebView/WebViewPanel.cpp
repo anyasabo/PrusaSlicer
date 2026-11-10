@@ -263,7 +263,7 @@ void WebViewPanel::on_show(wxShowEvent& evt)
     if (!m_host) {
         return;
     }
-    [[maybe_unused]] bool b = process_logic_command_vector(std::move(m_logic->on_show_webview_event(evt.IsShown())));
+    [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_show_webview_event(evt.IsShown()));
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
 
@@ -271,7 +271,7 @@ void WebViewPanel::on_script_message(wxWebViewEvent& evt)
 {
     if (!m_host)
         return;
-    if (!process_logic_command_vector(std::move(m_logic->on_script_message_webview_event(into_u8(evt.GetString())))))
+    if (!process_logic_command_vector(m_logic->on_script_message_webview_event(into_u8(evt.GetString()))))
     {
         evt.Veto();
     }
@@ -283,10 +283,10 @@ void WebViewPanel::on_navigation_request(wxWebViewEvent& evt)
     if (!web_view)
         return;
     if (!process_logic_command_vector(
-            std::move(m_logic->on_navigation_request_webview_event(
+            m_logic->on_navigation_request_webview_event(
                 into_u8(evt.GetURL()),
                 into_u8(web_view->GetCurrentURL())
-            ))
+            )
         ))
     {
         evt.Veto();
@@ -297,7 +297,7 @@ void WebViewPanel::on_loaded(wxWebViewEvent& evt)
 {
     if (!m_host)
         return;
-    if (!process_logic_command_vector(std::move(m_logic->on_loaded_webview_event(into_u8(evt.GetURL())))))
+    if (!process_logic_command_vector(m_logic->on_loaded_webview_event(into_u8(evt.GetURL()))))
     {
         evt.Veto();
     }
@@ -308,7 +308,7 @@ void WebViewPanel::on_loaded(wxWebViewEvent& evt)
 
 void WebViewPanel::on_page_will_load()
 {
-    [[maybe_unused]] bool b = process_logic_command_vector(std::move(m_logic->on_page_will_load_webview_event()));
+    [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_page_will_load_webview_event());
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
 

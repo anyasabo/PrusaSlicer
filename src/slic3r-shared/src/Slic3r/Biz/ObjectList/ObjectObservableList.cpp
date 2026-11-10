@@ -16,9 +16,9 @@ ObjectObservableList::ObjectObservableList(
     std::optional<size_t> config_container_id,
     std::optional<size_t> bed_id
 ) :
+    m_project_interactor(project_interactor),
     m_scene_changed_listener_scope(project_interactor.scene_interactor(), *this),
     m_scene_selection_listener_scope(project_interactor.scene_interactor(), *this),
-    m_project_interactor(project_interactor),
     m_project_id(project_id),
     m_config_container_id(config_container_id),
     m_bed_id(bed_id)

@@ -18,8 +18,8 @@ InstanceObservableList::InstanceObservableList(
 ) :
     m_project_interactor(project_interactor),
     m_project_id(project_id),
-    m_bed_id(bed_id),
-    m_object_id(object_id)
+    m_object_id(object_id),
+    m_bed_id(bed_id)
 {
     update_data();
 }

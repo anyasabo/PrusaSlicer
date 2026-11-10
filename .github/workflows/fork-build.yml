@@ -21,7 +21,15 @@ on:
   push:
     branches: [anya/main]
     tags: ['v*-anya.*']
+    # A change to the documentation only does not start a build. A tag always builds (tags ignore paths-ignore).
+    paths-ignore: ['**.md', 'doc/**']
+  # By hand: gh workflow run "Fork build" -R anyasabo/PrusaSlicer --ref anya/main -f gcc_check=true
   workflow_dispatch:
+    inputs:
+      gcc_check:
+        description: Also compile with GCC 16 (the check job)
+        type: boolean
+        default: false
 
 concurrency:
   group: fork-build-${{ github.ref }}
@@ -40,6 +48,8 @@ env:
   # The precompiled headers (SLIC3R_PCH) need these for ccache hits. On clang, build.sh also adds
   # -Xclang -fno-pch-timestamp: without it, each file misses the cache.
   CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+  # The same generator as the devspace. The autotools deps (GMP, MPFR) still use make in their own steps.
+  CMAKE_GENERATOR: Ninja
 
 jobs:
   build:
@@ -76,7 +86,7 @@ jobs:
       # doc/Build.md, "0. Prerequisites", and ccache.
       - name: System packages (macOS)
         if: runner.os == 'macOS'
-        run: brew install automake cmake git gettext libtool texinfo ccache
+        run: brew install automake cmake git gettext libtool texinfo ccache ninja
       - name: System packages (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -87,7 +97,7 @@ jobs:
             sudo tee /etc/apt/sources.list.d/llvm-23.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y git build-essential autoconf cmake libtool libglu1-mesa-dev libgtk-3-dev \
-            libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache clang-23 lld-23 llvm-23
+            libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache ninja-build clang-23 lld-23 llvm-23
 
       - name: Cache keys
         id: keys
@@ -97,10 +107,12 @@ jobs:
           else
             os="$(. /etc/os-release && echo "$ID-$VERSION_ID")"
           fi
-          cxx=$("${CXX:-c++}" --version | head -1 | sed 's/[^A-Za-z0-9.]\+/-/g')
-          echo "deps=deps-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx-${{ hashFiles('deps/**', 'cmake/modules/**') }}" >> "$GITHUB_OUTPUT"
-          echo "ccache=ccache-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx" >> "$GITHUB_OUTPUT"
-          echo "lto=lto-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx" >> "$GITHUB_OUTPUT"
+          cxx=$("${CXX:-c++}" --version | head -1 | tr -cs 'A-Za-z0-9.\n' '-')
+          {
+            echo "deps=deps-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx-${{ hashFiles('deps/**', 'cmake/modules/**') }}"
+            echo "ccache=ccache-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx"
+            echo "lto=lto-$RUNNER_OS-$RUNNER_ARCH-$os-$cxx"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Restore the dependencies
         id: deps
@@ -173,9 +185,9 @@ jobs:
 
   # A second compiler as a check: GCC 16.2 (Ubuntu 26.10 has it, the 26.04 runner has only a snapshot). Different
   # compilers find different problems (warnings, undefined behaviour). It only compiles: no LTO (CMakeLists.txt turns
-  # LTO on for Release only), no debug info, no package, no release. Not on tags.
+  # LTO on for Release only), no debug info, no package, no release. Only by hand (workflow_dispatch, gcc_check).
   gcc-check:
-    if: github.ref_type != 'tag'
+    if: github.event_name == 'workflow_dispatch' && inputs.gcc_check
     name: linux-gcc16-check
     runs-on: ubuntu-26.04
     container: ubuntu:26.10
@@ -190,7 +202,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y git build-essential autoconf cmake libtool libglu1-mesa-dev \
-            libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache gcc-16 g++-16 curl ca-certificates
+            libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo ccache ninja-build gcc-16 g++-16 curl ca-certificates
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout
@@ -202,7 +214,7 @@ jobs:
         id: keys
         run: |
           os="$(. /etc/os-release && echo "$ID-$VERSION_ID")"
-          cxx=$("$CXX" --version | head -1 | sed 's/[^A-Za-z0-9.]\+/-/g')
+          cxx=$("$CXX" --version | head -1 | tr -cs 'A-Za-z0-9.\n' '-')
           echo "deps=deps-check-$os-$cxx-${{ hashFiles('deps/**', 'cmake/modules/**') }}" >> "$GITHUB_OUTPUT"
           echo "ccache=ccache-check-$os-$cxx" >> "$GITHUB_OUTPUT"
 

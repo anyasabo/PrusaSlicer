@@ -22,6 +22,17 @@ The same scripts run locally and in CI (`.github/workflows/fork-build.yml`):
 
 With prebuilt dependencies: `DEPS_PREFIX="/path/a;/path/b" .github/fork/build.sh app`.
 
+CI starts on each push to `anya/main` that changes more than documentation (`*.md`, `doc/`). It builds with clang:
+Apple clang on macOS, and the latest LLVM (clang-23, lld) on Linux. A second compile with GCC 16 is a check for
+warnings. It runs only by hand:
+
+```sh
+gh workflow run "Fork build" -R anyasabo/PrusaSlicer --ref anya/main -f gcc_check=true
+```
+
+Renovate (`renovate.json`) updates the GitHub Actions on `anya/main` only. It does not change `deps/`: a dependency
+update goes to a topic branch for upstream.
+
 ## Release
 
 1. Tag `anya/main`: `git tag -a v3.0.0-alpha14-anya.1 -m "..."`, then push the tag.
@@ -30,4 +41,4 @@ With prebuilt dependencies: `DEPS_PREFIX="/path/a;/path/b" .github/fork/build.sh
 
 The version is upstream `SLIC3R_VERSION`, with the suffix after `+` in the build ID (see `version.inc`). The suffix
 comes from the tag: `anya.1`. A build without a tag gets `anya-dev` (the package names add the commit). The build ID
-is in a header that about 150 files include, so a value that changes on each commit would make them miss ccache.
+is in a header that about 150 files include, so a value that changes on each commit makes them miss ccache.

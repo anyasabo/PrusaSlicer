@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommitsDisabled"
+  ],
+  "description": "The fork anyasabo/PrusaSlicer: only the fork files on anya/main. master follows upstream. A bump in deps/ goes to a topic branch for upstream (.github/fork/README.md).",
+  "baseBranchPatterns": ["anya/main"],
+  "enabledManagers": ["github-actions"],
+  "packageRules": [
+    {
+      "description": "Group the GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}

@@ -211,19 +211,27 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
         # We will turn the warning of for GCC for now:
         -Wno-unknown-pragmas
-
-        # GCC 13+ warns when a type is used in a SFINAE/type-trait context (e.g. std::is_assignable,
-        # pulled in transitively by <algorithm>/<type_traits>) while only forward-declared, and is
-        # later fully defined in the same translation unit. This codebase relies heavily on
-        # forward-declaring UI-owner types across many headers for compile-time firewalling.
-        # None of these types are ever used by value in a container/trait that would make the
-        # incomplete-type SFINAE result observable, so this is noise, not a bug.
-        -Wno-sfinae-incomplete
     )
 endif()
 
-# check if our compiler supports -fno-link-libatomic
 include(CheckCXXCompilerFlag)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    # GCC 16+ warns when a type is used in a SFINAE/type-trait context (e.g. std::is_assignable,
+    # pulled in transitively by <algorithm>/<type_traits>) while only forward-declared, and is
+    # later fully defined in the same translation unit. This codebase relies heavily on
+    # forward-declaring UI-owner types across many headers for compile-time firewalling.
+    # None of these types are ever used by value in a container/trait that would make the
+    # incomplete-type SFINAE result observable, so this is noise, not a bug.
+    # Older GCC does not know the option. It accepts the -Wno- form, but then prints an
+    # "unrecognized command-line option" note with each other warning, so test the positive form.
+    check_cxx_compiler_flag("-Wsfinae-incomplete" CXX_SUPPORTS_WSFINAE_INCOMPLETE)
+    if (CXX_SUPPORTS_WSFINAE_INCOMPLETE)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-sfinae-incomplete>)
+    endif()
+endif()
+
+# check if our compiler supports -fno-link-libatomic
 check_cxx_compiler_flag("-fno-link-libatomic" CXX_SUPPORTS_FNO_LINK_LIBATOMIC)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CXX_SUPPORTS_FNO_LINK_LIBATOMIC)
     # do not auto-append -latomic_asneeded (which usually comes from webkitgtk)

@@ -15,7 +15,7 @@
 # The compiler comes from the environment (CC, CXX), as for a local user. CI uses the latest LLVM (clang-23 on Linux).
 #
 # Environment:
-#   JOBS          parallel jobs (default: all CPUs)
+#   JOBS          parallel jobs, also in each dependency build (DEP_MAX_THREADS). Default: all CPUs
 #   DEPS_PREFIX   the CMAKE_PREFIX_PATH of the dependencies. Default: deps/build/destdir/usr/local (doc/Build.md).
 #                 A ';' list is allowed, for prebuilt dependencies (for example the devspace cache).
 #   FORK_SUFFIX   the version suffix (default: from the git tag v<version>-<suffix>, else "anya-dev")
@@ -54,7 +54,9 @@ fork_suffix() {
 
 build_deps() {
     echo "== doc/Build.md step 1: dependencies"
-    cmake -S deps -B deps/build
+    # DEP_MAX_THREADS: the job count in each dependency build. Its default is the number of CPUs of the host, also in a
+    # container with a CPU quota.
+    cmake -S deps -B deps/build -DDEP_MAX_THREADS="$JOBS"
     cmake --build deps/build -j "$JOBS"
     echo "== doc/Build.md step 1.1: a second build must do nothing"
     cmake --build deps/build -j "$JOBS"

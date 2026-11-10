@@ -15,11 +15,7 @@ namespace Slic3r::App::Scene {
 namespace {
 
 constexpr double TWO_PI = 2.0 * std::numbers::pi;
-constexpr double HALF_PI = 0.5 * std::numbers::pi;
 
-constexpr double AXIS_LINE_LENGTH = 30.0;
-constexpr double CONE_RADIUS = 5.0;
-constexpr double CONE_HEIGHT = 10.0;
 constexpr double ANGLE_STEP = 2 * std::numbers::pi / 32; // 32 steps in full circle
 
 constexpr uint8_t CIRCLE_RES = 64; // 64 steps in full circle

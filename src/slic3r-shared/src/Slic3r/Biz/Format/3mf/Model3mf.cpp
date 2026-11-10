@@ -92,7 +92,7 @@ constexpr const char *TYPE_ATTR = "type";
 constexpr const char *PRESERVE_ATTR = "preserve";
 
 // resources nodes
-constexpr const char *BASEMATERIALS_TAG = "basematerials";
+[[maybe_unused]] constexpr const char *BASEMATERIALS_TAG = "basematerials";
 constexpr const char *OBJECT_TAG = "object";
 
 // Build node
@@ -104,7 +104,7 @@ constexpr const char *TRANSFORM_ATTR = "transform";
 constexpr const char *PARTNUMBER_ATTR = "partnumber";
 
 // Item nodes
-constexpr const char *METADATAGROUP_TAG = "metadatagroup"; // zero OR one tag
+[[maybe_unused]] constexpr const char *METADATAGROUP_TAG = "metadatagroup"; // zero OR one tag
 
 // object attr
 constexpr const char *ID_ATTR = "id";
@@ -137,14 +137,14 @@ constexpr const char *V1_ATTR = "v1";
 constexpr const char *V2_ATTR = "v2";
 constexpr const char *V3_ATTR = "v3";
 
-constexpr const char *TRIANGLESETS_TAG = "t:trianglesets";
+[[maybe_unused]] constexpr const char *TRIANGLESETS_TAG = "t:trianglesets";
 constexpr const char *MIRRORMESH_TAG = "mm:mirrormesh";
 
 constexpr const char *COMPONENTS_TAG = "components";
 constexpr const char *COMPONENT_TAG = "component";
 
 // production attribute
-constexpr const char *PROD_NS = "p:";
+[[maybe_unused]] constexpr const char *PROD_NS = "p:";
 constexpr const char *PATH_ATTR = "path";
 constexpr const char *UUID_ATTR = "UUID";
 

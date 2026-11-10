@@ -104,8 +104,9 @@ struct Branch;
 
 struct Bifurcation
 {
-    Branch     *branch;
-    double      area;
+    // Null for the down bifurcation of a root branch.
+    Branch     *branch { nullptr };
+    double      area   { 0. };
 };
 
 // Single branch of a tree.
@@ -127,7 +128,7 @@ struct Branch
 
     // How many of the thick up branches are considered continuation of the trunk?
     // These will be smoothed out together.
-    size_t                  num_up_trunk;
+    size_t                  num_up_trunk { 0 };
 
     bool has_root() const { return this->down.branch == nullptr; }
     bool has_tip()  const { return this->up.empty(); }

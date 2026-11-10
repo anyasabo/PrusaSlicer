@@ -167,8 +167,9 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			// Read a single facet from an ASCII .STL file
 			// skip solid/endsolid
 			// (in this order, otherwise it won't work when they are paired in the middle of a file)
-			(void)fscanf(fp, " endsolid%*[^\n]\n");
-			(void)fscanf(fp, " solid%*[^\n]\n");  // name might contain spaces so %*s doesn't work and it also can be empty (just "solid")
+			// A missing "endsolid" or "solid" is normal: the result does not matter. The reads of the facet below find an end of file.
+			[[maybe_unused]] int res_skip = fscanf(fp, " endsolid%*[^\n]\n");
+			res_skip = fscanf(fp, " solid%*[^\n]\n");  // name might contain spaces so %*s doesn't work and it also can be empty (just "solid")
 			// Leading space in the fscanf format skips all leading white spaces including numerous new lines and tabs.
 			int res_normal     = fscanf(fp, " facet normal %31s %31s %31s", normal_buf[0], normal_buf[1], normal_buf[2]);
 			assert(res_normal == 3);
@@ -182,13 +183,16 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			int res_vertex3    = fscanf(fp, " vertex %f %f %f ", &facet.vertex[2](0), &facet.vertex[2](1), &facet.vertex[2](2));
 			assert(res_vertex3 == 3);
 			// Some G-code generators tend to produce text after "endloop" and "endfacet". Just ignore it.
+			// At the end of a truncated file, fgets reads nothing. Then buf must be empty, not uninitialized.
 			char buf[2048];
-			(void)fgets(buf, 2047, fp);
+			if (fgets(buf, sizeof(buf), fp) == nullptr)
+				buf[0] = '\0';
 			bool endloop_ok = strncmp(buf, "endloop", 7) == 0 && (buf[7] == '\r' || buf[7] == '\n' || buf[7] == ' ' || buf[7] == '\t');
 			assert(endloop_ok);
 			// Skip the trailing whitespaces and empty lines.
-			(void)fscanf(fp, " ");
-			(void)fgets(buf, 2047, fp);
+			res_skip = fscanf(fp, " ");
+			if (fgets(buf, sizeof(buf), fp) == nullptr)
+				buf[0] = '\0';
 			bool endfacet_ok = strncmp(buf, "endfacet", 8) == 0 && (buf[8] == '\r' || buf[8] == '\n' || buf[8] == ' ' || buf[8] == '\t');
 			assert(endfacet_ok);
 			if (res_normal != 3 || res_outer_loop != 0 || res_vertex1 != 3 || res_vertex2 != 3 || res_vertex3 != 3 || ! endloop_ok || ! endfacet_ok) {

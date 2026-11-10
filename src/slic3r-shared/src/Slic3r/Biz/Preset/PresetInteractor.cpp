@@ -669,7 +669,8 @@ void PresetInteractor::save_user_preset_internal(
     auto& preset_bundle   = m_workbench.preset_bundle();
     auto names = get_all_vendor_preset_names(kind, ids.vendor_id);
     std::vector<std::string> ids_to_delete;
-    Domain::Preset::PresetOrigin source_origin;
+    // The switch below sets it for each PresetKind. The initial value is for GCC -Wmaybe-uninitialized only.
+    Domain::Preset::PresetOrigin source_origin = Domain::Preset::PresetOrigin::System;
 
     switch (kind) {
     case Domain::Preset::PresetKind::FdmPrinter:

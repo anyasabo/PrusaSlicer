@@ -1673,10 +1673,11 @@ static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryI
         const bool                   first           = graph.first(cp);
         int                          extend_next_idx = -1;
         int                          extend_prev_idx = -1;
-        coord_t                      dist_y_prev;
-        coord_t                      dist_y_next;
-        double                       arc_len_prev;
-        double                       arc_len_next;
+        // Valid only if extend_prev_idx / extend_next_idx is not -1.
+        coord_t                      dist_y_prev  = 0;
+        coord_t                      dist_y_next  = 0;
+        double                       arc_len_prev = 0.;
+        double                       arc_len_next = 0.;
 
         if (! graph.next_vertical(cp)){
             size_t i = cp.point_idx;

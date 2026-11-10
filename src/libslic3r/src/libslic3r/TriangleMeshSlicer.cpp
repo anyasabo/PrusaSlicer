@@ -2574,7 +2574,8 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
 
             // intersect v0-v1 and v2-v0 with cutting plane and make new vertices
             auto new_vertex = [upper, lower, &upper_slice_vertices, &lower_slice_vertices](const Vec3f &a, const int ia, const Vec3f &b, const int ib, const Vec3f &c) {
-                int iupper, ilower;
+                // -1: no new vertex, because upper or lower is null.
+                int iupper = -1, ilower = -1;
                 if (c == a)
                     iupper = ilower = ia;
                 else if (c == b)

@@ -200,8 +200,8 @@ static bool clip_narrow_corner(
             assert(p02 == p22);
             auto orient1 = cross2(p02 - p2, p0 - p2);
             auto orient2 = cross2(p2 - p0, p22 - p0);
-            assert(orient1 > 0 == blocked);
-            assert(orient2 > 0 == blocked);
+            assert((orient1 > 0) == blocked);
+            assert((orient2 > 0) == blocked);
         }
 #endif // NDEBUG
         if (polygon.size() < 3 || (forward == Far && backward == Far)) {

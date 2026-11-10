@@ -1,5 +1,4 @@
 #include "Slic3r/Biz/Parser/PlaceholderParser.hpp"
-#include "Slic3r/Version.hpp"
 
 #include <cstring>
 #include <ctime>

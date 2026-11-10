@@ -46,7 +46,7 @@ size_t PrintHostJobManager::emplace_job(PhysicalPrinter::PhysicalPrinterConfig c
         }
     }
 
-    std::function job_func = [this, &wrapper](Biz::JThread::StopToken stop_token,
+    std::function job_func = [&wrapper](Biz::JThread::StopToken stop_token,
                                  Biz::Platform::JobManager::ProgressTracker progress_tracker) -> bool
     {
         for (const auto& dep : wrapper.dependencies) {
@@ -84,7 +84,7 @@ size_t PrintHostJobManager::emplace_job(PhysicalPrinter::PhysicalPrinterConfig c
                 if (stop_token.stop_requested())
                     cancel = true;
             },
-            [stop_token, &progress_tracker](Network::IHttp::Retry retry, bool& cancel)
+            [stop_token](Network::IHttp::Retry retry, bool& cancel)
             {
                 if (stop_token.stop_requested())
                     cancel = true;

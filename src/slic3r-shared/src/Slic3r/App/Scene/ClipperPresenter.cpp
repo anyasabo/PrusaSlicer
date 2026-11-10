@@ -169,7 +169,7 @@ void ClipperPresenter::build_meshes_nodes(const Domain::Transform3d& inst_trafo)
         builder.set_debug_name(fmt::format("Clipped model:vol {}", volume_id))
             .set_tag(id)
             .set_mesh(geom, material, int(0))
-            .transform([trafo, volume](auto& xform) { xform = trafo; });
+            .transform([trafo](auto& xform) { xform = trafo; });
 
         m_scene_provider->scene().add_child(builder.build().release(), m_main_node);
     }

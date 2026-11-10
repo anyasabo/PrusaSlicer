@@ -80,7 +80,7 @@ VolumeButton::VolumeButton(
         };
     };
 
-    callbacks().action = [this, &project_interactor, get_selection]()
+    callbacks().action = [&project_interactor, get_selection]()
     { select_elements(project_interactor, get_selection()); };
     callbacks().secondary_action =
         [this, &project_interactor, &context_menu_requester, get_selection]()

@@ -378,7 +378,7 @@ void MenuCommandRegistrar::register_bed_menu_add_shape_commands()
         .append_item(
             MenuItemName::ObjectShapeCube,
             "add-object-shape-cube",
-            [this, add_object_shape]()
+            [add_object_shape]()
             {
                 add_object_shape(Scene::GeometryDataId::Cube, UndoSnapshotType::AddCube);
             }
@@ -386,7 +386,7 @@ void MenuCommandRegistrar::register_bed_menu_add_shape_commands()
         .append_item(
             MenuItemName::ObjectShapeCylinder,
             "add-object-shape-cylinder",
-            [this, add_object_shape]()
+            [add_object_shape]()
             {
                 add_object_shape(Scene::GeometryDataId::Cylinder, UndoSnapshotType::AddCylinder);
             }
@@ -394,7 +394,7 @@ void MenuCommandRegistrar::register_bed_menu_add_shape_commands()
         .append_item(
             MenuItemName::ObjectShapeSphere,
             "add-object-shape-sphere",
-            [this, add_object_shape]()
+            [add_object_shape]()
             {
                 add_object_shape(Scene::GeometryDataId::Sphere, UndoSnapshotType::AddSphere);
             }
@@ -1862,7 +1862,7 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
             {MenuItemName::MainMenu, MenuItemName::Help, MenuItemName::PSWebsite},
             std::make_unique<UIItemCommand>(
                 CommandName::PSWebsite,
-                [this]()
+                []()
                 {
                     open_browser(
                         OpenBrowserParams{
@@ -1881,7 +1881,7 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
             {MenuItemName::MainMenu, MenuItemName::Help, MenuItemName::Samples},
             std::make_unique<UIItemCommand>(
                 CommandName::Samples,
-                [this]()
+                []()
                 {
                     open_browser(
                         OpenBrowserParams{
@@ -1899,7 +1899,7 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
             {MenuItemName::MainMenu, MenuItemName::Help, MenuItemName::Releases},
             std::make_unique<UIItemCommand>(
                 CommandName::Releases,
-                [this]()
+                []()
                 {
                     open_browser(
                         OpenBrowserParams{
@@ -1943,7 +1943,7 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
             {MenuItemName::MainMenu, MenuItemName::Help, MenuItemName::ReportAnIssue},
             std::make_unique<UIItemCommand>(
                 CommandName::ReportAnIssue,
-                [this]()
+                []()
                 {
                     open_browser(
                         OpenBrowserParams{

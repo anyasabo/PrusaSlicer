@@ -1613,7 +1613,7 @@ void CutGizmo::update_cut_plane_mesh()
 
     const auto& trimesh = m_model_triangle_mesh_manager.get_or_create(
         id,
-        [&, this]() -> std::unique_ptr<Scene::TriangleMesh>
+        [&]() -> std::unique_ptr<Scene::TriangleMesh>
         { return std::make_unique<Scene::TriangleMesh>(std::move(its)); }
     );
     const auto* geom = m_model_geometry_manager.get_or_create(

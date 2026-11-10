@@ -582,7 +582,7 @@ void Scene::render_no_shadows_pass(const Camera& camera, Render::CommandBuffer& 
 {
     ZoneScoped;
 
-    NodeMaterials nodes = collect_nodes_with_material([this](auto n) {
+    NodeMaterials nodes = collect_nodes_with_material([](auto n) {
         return n->has_render_component() && (!s_graphics_settings.shadows_enabled() || !n->render_component()->receive_shadows());
     });
 

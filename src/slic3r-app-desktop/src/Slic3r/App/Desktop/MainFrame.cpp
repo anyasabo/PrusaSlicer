@@ -132,7 +132,7 @@ MainFrame::MainFrame(
     complete_and_bind_left_bar();
 
     m_tabs_bar_menus.set_account_menu_callbacks(
-        [this, &project_interactor]()
+        [&project_interactor]()
         {
             if (!project_interactor.user_account_interactor().is_logged_in()) {
                 AppServices::instance().dialog_manager().show_webview_dialog(

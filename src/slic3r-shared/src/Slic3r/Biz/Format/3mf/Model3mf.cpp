@@ -1305,7 +1305,7 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
 
     // keep count of addressing of vertex in triangles
     std::vector<unsigned> is_vertex_used;
-    auto unused_vertex_write = [&is_vertex_used, vertices_count](const Domain::Index3& t) { 
+    [[maybe_unused]] auto unused_vertex_write = [&is_vertex_used, vertices_count](const Domain::Index3& t) { 
         if (is_vertex_used.empty()){
             // first call of function initialize vector
             is_vertex_used = std::vector<unsigned>(vertices_count, {0});
@@ -1315,7 +1315,7 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
         return true; // return bool to be possible check only in debug
     };
 
-    auto is_valid = [vertices_count, &unused_vertex_write](const Domain::Index3 &t) {
+    auto is_valid = [&, vertices_count](const Domain::Index3 &t) {
         // check unused vertex - each vertex SHOULD be addressed at least 3 times
         assert(unused_vertex_write(t));
 
@@ -1376,7 +1376,7 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
     
     // check unused vertex - each vertex SHOULD be addressed at least 3 times
     // otherwise there is bad volume
-    auto is_each_vertex_used_three_times = [&is_vertex_used]() {
+    [[maybe_unused]] auto is_each_vertex_used_three_times = [&is_vertex_used]() {
         for (unsigned count: is_vertex_used)
             if (count < 3)
                 return false;

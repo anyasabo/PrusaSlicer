@@ -1763,7 +1763,7 @@ void MeasureGizmo::build_point_feature(
 
     std::string id = "feature_point";
 
-    auto trimesh = m_current_project->triangle_mesh_manager.get_or_create(id, [this]() {
+    auto trimesh = m_current_project->triangle_mesh_manager.get_or_create(id, []() {
         Domain::TriangleMesh mesh = Biz::Algorithms::TriangleMesh::make_sphere(
             SPHERE_RADIUS,
             SPHERE_RESOLUTION_ANGLE

@@ -586,7 +586,7 @@ void ProjectInteractor::save_project(
     project.directory_storage().set_project_dir(file_path);
 
     invoke_listeners<IProjectsChangedListener>(
-        [this, project_id](auto* l)
+        [project_id](auto* l)
         {
             l->on_project_changed(project_id);
             l->on_project_saved(project_id);

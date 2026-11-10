@@ -108,7 +108,7 @@ void ObjectButton::set_callbacks(
 {
     Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
 
-    m_on_printable_toggled = [&scene_interactor, get_selection, this](bool printable)
+    m_on_printable_toggled = [&scene_interactor, get_selection](bool printable)
     {
         const Biz::Scene::ObjectSelection::ElementRefs& elements = get_selection().elements;
         if (!elements.empty()) {

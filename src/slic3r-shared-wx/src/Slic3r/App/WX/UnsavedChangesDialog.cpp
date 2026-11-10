@@ -157,7 +157,7 @@ void UnsavedChangesDialog::add_buttons(wxBoxSizer* buttons)
 
         (*btn)->Bind(
             wxEVT_UPDATE_UI,
-            [this, is_enabled_fn](wxUpdateUIEvent& evt)
+            [is_enabled_fn](wxUpdateUIEvent& evt)
             {
                 if (is_enabled_fn)
                     evt.Enable(is_enabled_fn());

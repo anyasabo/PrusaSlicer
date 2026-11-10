@@ -72,7 +72,7 @@ PrintToolSubcategoryItem::PrintToolSubcategoryItem(
     m_rows_filter_list->set_source_model(m_cbi.observable_list());
 
     m_rows_list_view = emplace_back<PrintToolRowListView>(
-        PrintToolRowListViewFactory{m_cbi, m_cbi_setter, project_interactor}
+        PrintToolRowListViewFactory{m_cbi_setter, project_interactor}
     );
     m_rows_list_view->set_object_name("PrintToolRowListView");
     m_rows_list_view->set_orientation(Orientation::Vertical);

@@ -16,13 +16,6 @@ using namespace Slic3r::App::Yoga;
 
 namespace Slic3r::App {
 
-static float measure_widest(const std::string& left, const std::string& right)
-{
-    const ImVec2 left_size  = ImGui::CalcTextSize(left.c_str());
-    const ImVec2 right_size = ImGui::CalcTextSize(right.c_str());
-    return std::max(left_size.x, right_size.x);
-}
-
 ExplanationView::ExplanationView(size_t index, const ExplanationPart& data) :
     Biz::DataObserver<ExplanationPart>(index, data),
     Text(std::string{})

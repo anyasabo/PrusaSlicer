@@ -56,7 +56,6 @@ private:
     using ExtruderOptionListView =
         Yoga::ListView<ExtruderOptionRow, Biz::PrintToolItem, ExtruderOptionListViewFactory>;
 
-    Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
 
     ToolToFeatureDialogHeader* m_header{nullptr};

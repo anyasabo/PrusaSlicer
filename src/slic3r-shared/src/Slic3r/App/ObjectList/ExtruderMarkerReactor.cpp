@@ -60,8 +60,7 @@ void ExtruderMarkerReactor::on_preset_value_changed(
 {
     if (m_config_container_id
             && config_container_id == *m_config_container_id
-            && item.name() == "extruder"
-        || item.name().ends_with("_extruder"))
+            && (item.name() == "extruder" || item.name().ends_with("_extruder")))
     {
         refresh();
     }

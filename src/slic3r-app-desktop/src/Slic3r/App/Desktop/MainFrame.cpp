@@ -82,14 +82,12 @@ static wxIcon main_frame_icon()
 #endif // _WIN32
 
 MainFrame::MainFrame(
-    Domain::Workbench& workbench,
     Biz::ProjectInteractor& project_interactor,
     Navigator& navigator,
     std::shared_ptr<ProjectSaver> project_saver
 ) :
     wxFrame(nullptr, wxID_ANY, from_u8(::Slic3r::BUILD_ID), wxDefaultPosition,wxDefaultSize,
         wxDEFAULT_FRAME_STYLE, from_u8("mainframe")),
-    m_workbench(workbench),
     m_project_interactor(project_interactor),
     m_preset_interactor(project_interactor.preset_interactor()),
     m_navigator(navigator),
@@ -133,7 +131,7 @@ MainFrame::MainFrame(
     complete_and_bind_left_bar();
 
     m_tabs_bar_menus.set_account_menu_callbacks(
-        [this, &project_interactor]()
+        [&project_interactor]()
         {
             if (!project_interactor.user_account_interactor().is_logged_in()) {
                 AppServices::instance().dialog_manager().show_webview_dialog(

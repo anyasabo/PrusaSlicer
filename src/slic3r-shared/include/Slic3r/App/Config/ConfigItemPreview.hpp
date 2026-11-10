@@ -23,7 +23,6 @@ public:
 
 private:
     Domain::ConfigItemDef::GUIType m_last_gui_type{Domain::ConfigItemDef::GUIType::undefined};
-    std::type_info* m_last_type{nullptr};
 
     Yoga::Text* m_input_text{nullptr};
     Yoga::Rectangle* m_input_color{nullptr};

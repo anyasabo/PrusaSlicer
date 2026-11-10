@@ -846,11 +846,11 @@ std::string serialize_as_legacy_config(
         ASSERT(cfg.tool.size() == cfg.filament.size() || cfg.tool.size() == 1);
         const size_t slot_count = cfg.filament.size();
         const size_t tool_count = cfg.tool.size();
-        for (int i = 0; i < slot_count; ++i) {
+        for (int i = 0; i < int(slot_count); ++i) {
             const int tool_idx = i % tool_count;
             boxes.emplace_back(&cfg.tool[tool_idx], i);
         }
-        for (int i = 0; i < cfg.filament.size(); ++i)
+        for (int i = 0; i < int(cfg.filament.size()); ++i)
             boxes.emplace_back(&cfg.filament[i], i);
         boxes.emplace_back(&cfg.project, -1);
     }

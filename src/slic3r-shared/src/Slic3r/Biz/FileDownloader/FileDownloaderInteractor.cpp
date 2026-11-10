@@ -13,12 +13,6 @@
 
 namespace Slic3r::Biz::FileDownloader {
 
-#ifndef NDEBUG
-constexpr bool debug{true};
-#else
-constexpr bool debug{false};
-#endif
-
 namespace {
 bool is_any_subdomain(const std::string& url, const std::vector<std::string>& subdomains)
 {

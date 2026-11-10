@@ -1009,9 +1009,6 @@ void PlaterRenderModule::init_gizmos()
     );
     m_arrange_gizmo = &m_gizmo_manager->add_tool_gizmo<ArrangeGizmo>(
         m_project_interactor.arrange_interactor(),
-        *m_device,
-        *m_scene_presenter,
-        m_gizmo_manager->data_factory(),
         m_project_interactor,
         m_workbench
     );

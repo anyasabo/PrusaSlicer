@@ -111,8 +111,6 @@ private:
     ConnectorsButton* m_connectors_button{nullptr};
     VolumesItem* m_volumes{nullptr};
     InstancesItem* m_instances{nullptr};
-
-    Biz::ProjectInteractor& m_project_interactor;
 };
 
 } // namespace ObjectList

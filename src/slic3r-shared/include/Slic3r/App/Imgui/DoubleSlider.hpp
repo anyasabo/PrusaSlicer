@@ -165,7 +165,6 @@ private:
     ImU32 m_border_color;
     std::string m_name;
     ImGuiSliderFlags m_flags{ ImGuiSliderFlags_None };
-    bool m_is_shown{ true };
     bool m_is_dragging{ false };
 
     int m_min_pos{ 0 };

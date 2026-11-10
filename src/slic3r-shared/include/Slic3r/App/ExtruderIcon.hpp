@@ -26,7 +26,6 @@ protected:
 
 private:
     ImColor m_fill_collor{IM_COL32_WHITE};
-    size_t m_extruder_index{0};
     bool m_extruder_index_visible{false};
     Yoga::Text* m_label{nullptr};
 };

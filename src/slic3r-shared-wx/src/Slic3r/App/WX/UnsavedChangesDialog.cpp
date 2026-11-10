@@ -47,11 +47,11 @@ UnsavedChangesDialog::UnsavedChangesDialog(
         wxDefaultSize,
         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
     ),
+    m_preset_names(preset_names),
+    m_preset_names_new(preset_names_new),
     m_config_original(config_original),
     m_config_selected(config_selected),
     m_config_new(config_new_selected),
-    m_preset_names(preset_names),
-    m_preset_names_new(preset_names_new),
     m_preset_interactor(preset_interactor),
     m_new_printer_has_multiple_extruders(new_printer_has_multiple_extruders)
 {
@@ -157,7 +157,7 @@ void UnsavedChangesDialog::add_buttons(wxBoxSizer* buttons)
 
         (*btn)->Bind(
             wxEVT_UPDATE_UI,
-            [this, is_enabled_fn](wxUpdateUIEvent& evt)
+            [is_enabled_fn](wxUpdateUIEvent& evt)
             {
                 if (is_enabled_fn)
                     evt.Enable(is_enabled_fn());

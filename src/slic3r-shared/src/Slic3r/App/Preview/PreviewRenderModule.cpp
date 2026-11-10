@@ -699,7 +699,7 @@ void PreviewRenderModule::register_commands()
     m_command_registry.register_command(
         std::make_unique<UIItemCommand>(
             CommandName::SwitchToInspect,
-            [this]() {},
+            []() {},
             UIItemCommandExtraOpts{
                 .checked =
                     [this]()

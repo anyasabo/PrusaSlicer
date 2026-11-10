@@ -20,9 +20,7 @@ ConfigSubcategoryListView::ConfigSubcategoryListView(
         ConfigSubcategoryListViewFactory,
         ScrollArea>(ConfigSubcategoryListViewFactory{cbi_container, cbi, cbi_index}),
     Biz::DataObserver<Biz::ConfigItemContext>(index, data),
-    m_cbi_container(cbi_container),
     m_cbi(cbi),
-    m_cbi_index(cbi_index),
     m_category_filter(
         std::make_shared<Biz::ObservableListSortFilter<
             Biz::ConfigItemContext,

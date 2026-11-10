@@ -60,7 +60,6 @@ class MainFrame :
 {
 public:
     MainFrame(
-        Domain::Workbench& workbench,
         Biz::ProjectInteractor& project_interactor,
         Navigator& navigator,
         std::shared_ptr<ProjectSaver> project_saver
@@ -134,7 +133,6 @@ private:
 #endif
 
 private:
-    Domain::Workbench& m_workbench;
     Biz::ProjectInteractor& m_project_interactor;
     Biz::Preset::PresetInteractor& m_preset_interactor;
     std::unique_ptr<Platform::WX::WXRenderCanvas> m_canvas;

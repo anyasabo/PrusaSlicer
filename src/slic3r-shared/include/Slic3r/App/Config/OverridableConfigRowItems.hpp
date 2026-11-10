@@ -30,7 +30,6 @@ class OverridableConfigRowItems :
         OverridableConfigRowItem,
         Biz::OverrideItem,
         Biz::IConfigBoxSetter&,
-        Biz::OverridableConfigBoxInteractor&,
         size_t>;
     using ConfigRowListView =
         Yoga::ListView<OverridableConfigRowItem, Biz::OverrideItem, ConfigRowListViewFactory>;

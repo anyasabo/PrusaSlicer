@@ -449,7 +449,7 @@ void render_imgui_graphics_settings_debug_window(const Domain::Project& project,
                                 ImGui::EndCombo();
                             }
 
-                            if (bf_sizes[sel_bf_size] != bf_size)
+                            if (size_t(bf_sizes[sel_bf_size]) != bf_size)
                                 Scene::set_ao_blur_filter_size(bf_sizes[sel_bf_size]);
                         }
 
@@ -832,13 +832,13 @@ void render_imgui_graphics_settings_debug_window(const Domain::Project& project,
                             if (ImGui::Checkbox("##shadows", &l.shadows)) {
                                 if (l.shadows) {
                                     for (size_t i = 0; i < lights.lights.size(); ++i) {
-                                        if (i == edit_id)
+                                        if (i == size_t(edit_id))
                                             continue;
                                         lights.lights[i].shadows = false;
                                     }
                                 } else if (lights.lights.size() == 2) {
                                     for (size_t i = 0; i < lights.lights.size(); ++i) {
-                                        if (i != edit_id)
+                                        if (i != size_t(edit_id))
                                             lights.lights[i].shadows = true;
                                     }
                                 }

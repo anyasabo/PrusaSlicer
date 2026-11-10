@@ -22,7 +22,6 @@ class PrintToolConfigObservableList :
 {
 public:
     explicit PrintToolConfigObservableList(
-        const Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
         Slicing::SlicingInteractor& slicing_interactor
     );
@@ -134,7 +133,6 @@ private:
     void update_effective_value_statuses(const Domain::SlicingId slicing_id);
 
 private:
-    const Domain::Workbench& m_workbench;
     Scene::SceneInteractor& m_scene_interactor;
 
     ListenerScope<

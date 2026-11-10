@@ -505,7 +505,7 @@ static std::string serialize(const std::vector<ParsedChunk>& chunks, std::size_t
             result += " =";
             if (def.vectorize && material_slot_count > 0) {
                 result += " (";
-                for (int i{}; i < material_slot_count; ++i) {
+                for (int i{}; i < int(material_slot_count); ++i) {
                     result += i == 0 ? "" : ",";
                     result += "\n";
                     auto expression{def.expression};

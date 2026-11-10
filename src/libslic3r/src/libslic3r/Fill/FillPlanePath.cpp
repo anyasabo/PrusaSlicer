@@ -229,13 +229,10 @@ static void generate_hilbert_curve(coord_t min_x, coord_t min_y, coord_t max_x, 
 {
     // Minimum power of two square to fit the domain.
     size_t sz = 2;
-    size_t pw = 1;
     {
         size_t sz0 = std::max(max_x + 1 - min_x, max_y + 1 - min_y);
-        while (sz < sz0) {
+        while (sz < sz0)
             sz = sz << 1;
-            ++ pw;
-        }
     }
 
     size_t sz2 = sz * sz;

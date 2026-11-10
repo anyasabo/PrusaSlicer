@@ -111,7 +111,7 @@ void LeftBarCtrl::on_compact_mode_changed()
     UpdateAccountButton(true);
     m_account_btn->set_compact_mode(compact, m_login_icon_sz, false);
     m_preferences_btn->set_compact_mode(compact, m_action_btn_sz, false);
-    for (int sizer_item_id = 0; sizer_item_id < m_second_sizer->GetItemCount(); sizer_item_id++) {
+    for (size_t sizer_item_id = 0; sizer_item_id < m_second_sizer->GetItemCount(); sizer_item_id++) {
         m_second_sizer->GetItem(sizer_item_id)
             ->SetFlag(wxALIGN_CENTER_HORIZONTAL | (m_compact_mode ? wxTOP : wxALL));
     }

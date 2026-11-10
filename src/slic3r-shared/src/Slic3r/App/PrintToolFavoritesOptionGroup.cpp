@@ -51,7 +51,6 @@ PrintToolFavoritesOptionGroup::PrintToolFavoritesOptionGroup(
     );
 
     m_favorites_list_view = emplace_back<PrintToolRowListView>(PrintToolRowListViewFactory{
-        project_interactor.preset_interactor().print_tool_cbi(),
         project_interactor.preset_interactor(),
         project_interactor,
         {.show_favorites = false, .show_explanation = false}

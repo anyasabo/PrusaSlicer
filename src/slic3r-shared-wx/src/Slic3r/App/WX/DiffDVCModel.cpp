@@ -141,9 +141,9 @@ ModelNode::ModelNode(
 ) :
     m_parent_win(parent->m_parent_win),
     m_parent(parent),
+    m_icon_name("empty"),
     m_old_color(old_value.StartsWith(from_u8("#")) ? into_u8(old_value) : ""),
     m_mod_color(mod_value.StartsWith(from_u8("#")) ? into_u8(mod_value) : ""),
-    m_icon_name("empty"),
     m_new_color(new_value.StartsWith(from_u8("#")) ? into_u8(new_value) : ""),
     m_text(text),
     m_old_value(old_value),

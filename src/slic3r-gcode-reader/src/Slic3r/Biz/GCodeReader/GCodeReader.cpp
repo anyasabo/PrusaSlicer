@@ -83,9 +83,9 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
         gline.m_raw.assign(ptr, c);
 
     // Skip the trailing newlines.
-	if (*c == '\r')
-		++ c;
-	if (*c == '\n')
+    if (*c == '\r')
+        ++ c;
+    if (*c == '\n')
 		++ c;
 
     if (m_verbose)

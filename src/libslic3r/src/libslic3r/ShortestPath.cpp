@@ -447,12 +447,12 @@ void update_end_point_in_queue(QueueType &queue, const KDTreeType &kdtree, Chain
 				// Only unconnected end point or a point next to an unconnected end point may be connected to.
 				// Ideally those would be removed from the KD tree, but the update is difficult.
 				return false;
-	    	assert(chain2a == 0 || chain2b == 0);
-	    	size_t chain2 = chains.equivalent(std::max(chain2a, chain2b));
-	    	if (this_chain == chain2)
-	    		// Don't connect back to the same chain, don't create a loop.
-	    		return this_chain == 0;
-	    	// Don't connect to a segment requiring flipping if the segment starts or ends with the first point.
+			assert(chain2a == 0 || chain2b == 0);
+			size_t chain2 = chains.equivalent(std::max(chain2a, chain2b));
+			if (this_chain == chain2)
+				// Don't connect back to the same chain, don't create a loop.
+				return this_chain == 0;
+			// Don't connect to a segment requiring flipping if the segment starts or ends with the first point.
 			if (chain2a > 0) {
 				// Chain requires flipping.
 				assert(chain2b == 0);
@@ -1938,7 +1938,7 @@ static inline void improve_ordering_by_two_exchanges_with_segment_flipping(Polyl
 	};
 	double cost_initial = cost();
 
-	static int iRun = 0;
+	[[maybe_unused]] static int iRun = 0;
 	++ iRun;
 #ifdef DEBUG_SVG_OUTPUT
 	svg_draw_polyline_chain("improve_ordering_by_two_exchanges_with_segment_flipping-initial", iRun, polylines);

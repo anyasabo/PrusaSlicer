@@ -190,12 +190,12 @@ void MaterialIterator::descent_to_material_slot()
 
 MaterialIterator& MaterialIterator::operator++()
 {
-    if (m_current_address.back() + 1 < current_slot_count()) {
+    if (size_t(m_current_address.back() + 1) < current_slot_count()) {
         m_current_address.back()++;
         descent_to_material_slot();
     } else {
         // move up till the next free slot is available
-        while (!m_current_address.empty() && m_current_address.back() + 1 >= current_slot_count())
+        while (!m_current_address.empty() && size_t(m_current_address.back() + 1) >= current_slot_count())
             m_current_address.pop_back();
         // if there is still valid address
         if (!m_current_address.empty()) {

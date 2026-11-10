@@ -916,7 +916,7 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
                 out.second.front().radius = 0;
             }
         } else {
-            assert(split_segment_id >= 0 && split_segment_id < path.size());
+            assert(split_segment_id >= 0 && size_t(split_segment_id) < path.size());
             if (split_segment_id + 1 == int(path.size()))
                 out.first = path;
             else if (split_segment_id == 0)
@@ -926,8 +926,8 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
                 out.first.assign(path.begin(), path.begin() + split_segment_id + 1);
                 out.second.assign(path.begin() + split_segment_id, path.end());
                 assert(out.first.size() + out.second.size() == path.size() + 1);
-                assert(out.first.back() == (split_segment_id == proj.segment_id ? start : end));
-                assert(out.second.front() == (split_segment_id == proj.segment_id ? start : end));
+                assert(out.first.back() == (size_t(split_segment_id) == proj.segment_id ? start : end));
+                assert(out.second.front() == (size_t(split_segment_id) == proj.segment_id ? start : end));
                 assert(out.first.size() > 1);
                 assert(out.second.size() > 1);
                 out.second.front().radius = 0;

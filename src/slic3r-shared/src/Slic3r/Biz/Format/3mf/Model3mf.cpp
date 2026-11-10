@@ -92,7 +92,7 @@ constexpr const char *TYPE_ATTR = "type";
 constexpr const char *PRESERVE_ATTR = "preserve";
 
 // resources nodes
-constexpr const char *BASEMATERIALS_TAG = "basematerials";
+[[maybe_unused]] constexpr const char *BASEMATERIALS_TAG = "basematerials";
 constexpr const char *OBJECT_TAG = "object";
 
 // Build node
@@ -104,7 +104,7 @@ constexpr const char *TRANSFORM_ATTR = "transform";
 constexpr const char *PARTNUMBER_ATTR = "partnumber";
 
 // Item nodes
-constexpr const char *METADATAGROUP_TAG = "metadatagroup"; // zero OR one tag
+[[maybe_unused]] constexpr const char *METADATAGROUP_TAG = "metadatagroup"; // zero OR one tag
 
 // object attr
 constexpr const char *ID_ATTR = "id";
@@ -137,14 +137,14 @@ constexpr const char *V1_ATTR = "v1";
 constexpr const char *V2_ATTR = "v2";
 constexpr const char *V3_ATTR = "v3";
 
-constexpr const char *TRIANGLESETS_TAG = "t:trianglesets";
+[[maybe_unused]] constexpr const char *TRIANGLESETS_TAG = "t:trianglesets";
 constexpr const char *MIRRORMESH_TAG = "mm:mirrormesh";
 
 constexpr const char *COMPONENTS_TAG = "components";
 constexpr const char *COMPONENT_TAG = "component";
 
 // production attribute
-constexpr const char *PROD_NS = "p:";
+[[maybe_unused]] constexpr const char *PROD_NS = "p:";
 constexpr const char *PATH_ATTR = "path";
 constexpr const char *UUID_ATTR = "UUID";
 
@@ -1305,7 +1305,7 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
 
     // keep count of addressing of vertex in triangles
     std::vector<unsigned> is_vertex_used;
-    auto unused_vertex_write = [&is_vertex_used, vertices_count](const Domain::Index3& t) { 
+    [[maybe_unused]] auto unused_vertex_write = [&is_vertex_used, vertices_count](const Domain::Index3& t) { 
         if (is_vertex_used.empty()){
             // first call of function initialize vector
             is_vertex_used = std::vector<unsigned>(vertices_count, {0});
@@ -1315,17 +1315,17 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
         return true; // return bool to be possible check only in debug
     };
 
-    auto is_valid = [vertices_count, &unused_vertex_write](const Domain::Index3 &t) {
+    auto is_valid = [&, vertices_count](const Domain::Index3 &t) {
         // check unused vertex - each vertex SHOULD be addressed at least 3 times
         assert(unused_vertex_write(t));
 
         // check range of vertex adress
-        assert(t[0] >= 0 && t[0] < vertices_count);
-        assert(t[1] >= 0 && t[1] < vertices_count);
-        assert(t[2] >= 0 && t[2] < vertices_count);
-        return t[0] >= 0 && t[0] < vertices_count &&
-               t[1] >= 0 && t[1] < vertices_count &&
-               t[2] >= 0 && t[2] < vertices_count;
+        assert(t[0] >= 0 && size_t(t[0]) < vertices_count);
+        assert(t[1] >= 0 && size_t(t[1]) < vertices_count);
+        assert(t[2] >= 0 && size_t(t[2]) < vertices_count);
+        return t[0] >= 0 && size_t(t[0]) < vertices_count &&
+               t[1] >= 0 && size_t(t[1]) < vertices_count &&
+               t[2] >= 0 && size_t(t[2]) < vertices_count;
     };
 
     // Fills the fixed buffer via the fast, unchecked karma generator - only safe because
@@ -1376,7 +1376,7 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
     
     // check unused vertex - each vertex SHOULD be addressed at least 3 times
     // otherwise there is bad volume
-    auto is_each_vertex_used_three_times = [&is_vertex_used]() {
+    [[maybe_unused]] auto is_each_vertex_used_three_times = [&is_vertex_used]() {
         for (unsigned count: is_vertex_used)
             if (count < 3)
                 return false;

@@ -99,20 +99,6 @@ namespace {
 
 const std::string PRINTER_TOOL_TYPE = "print_head";
 
-struct KeyDesc
-{
-    std::string key;
-    std::optional<std::string> json_key;
-};
-
-// This is a list of keys stored as features in material
-// which should be moved level up from features into material
-// when serializing into json
-const KeyDesc MATERIAL_KEYS_TO_EXTRACT[] = {
-    {"material_uuid"},
-    {"material_color"},
-};
-
 template <typename E>
 std::string enum_to_json(E val)
 {

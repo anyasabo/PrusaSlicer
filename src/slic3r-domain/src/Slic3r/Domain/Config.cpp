@@ -1049,7 +1049,7 @@ find_param(std::map<std::string, ConfigValueAndDef>& squashed_boxes, const std::
 
 static void clamp_extruders_to_single_slot(SquashResult& squashed_boxes)
 {
-    for (const std::string& key :
+    for (const std::string key :
          {"perimeter_extruder",
           "infill_extruder",
           "solid_infill_extruder",
@@ -1070,7 +1070,7 @@ static void expand_parameters(SquashResult& squashed_boxes, const std::size_t ma
 {
     if (const ConfigValueAndDef* extruder{find_param(squashed_boxes.squashed_values, "extruder")}) {
         if (extruder->value != ConfigValue{0}) {
-            for (const std::string& key :
+            for (const std::string key :
                  {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"})
             {
                 ConfigValueAndDef* specific_extruder{
@@ -1105,7 +1105,7 @@ static void expand_parameters(SquashResult& squashed_boxes, const std::size_t ma
             find_param(squashed_boxes.squashed_values, "first_layer_speed")})
     {
         for (
-            const std::string& key :
+            const std::string key :
             {
                 "first_layer_infill_speed",
                 "first_layer_solid_infill_speed",

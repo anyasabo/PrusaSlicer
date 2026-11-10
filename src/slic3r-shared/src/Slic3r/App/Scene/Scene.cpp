@@ -582,7 +582,7 @@ void Scene::render_no_shadows_pass(const Camera& camera, Render::CommandBuffer& 
 {
     ZoneScoped;
 
-    NodeMaterials nodes = collect_nodes_with_material([this](auto n) {
+    NodeMaterials nodes = collect_nodes_with_material([](auto n) {
         return n->has_render_component() && (!s_graphics_settings.shadows_enabled() || !n->render_component()->receive_shadows());
     });
 
@@ -703,8 +703,6 @@ void Scene::render_ao_gbuffer_pass(Render::Device& device, const Camera& camera,
     NodeMaterials nodes = collect_nodes_with_material([](auto n) {
         return n->has_render_component() && n->render_component()->receive_shadows() && !resolve_material(*n).transparent();
     });
-
-    const Shadows& shadows = s_graphics_settings.m_shadows;
 
     if (!nodes.empty()) {
         if (customizer)

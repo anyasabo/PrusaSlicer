@@ -466,7 +466,7 @@ SpinInputDouble::SpinInputDouble(wxWindow *     parent,
                                  long           style,
                                  double min, double max, double initial,
                                  double         inc)
-    : SpinInputBase(), min(min), max(max), val(initial)
+    : SpinInputBase(), val(initial), min(min), max(max)
 {
     Create(parent, text, label, pos, size, style, min, max, initial, inc);
 }

@@ -115,7 +115,6 @@ private:
     bool m_contour_enabled{true};
 
     Ray m_translation_ray;
-    double m_start_t{0};
 
     int inst_counter{0};
 };

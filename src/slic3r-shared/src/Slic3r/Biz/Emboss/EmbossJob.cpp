@@ -442,16 +442,6 @@ auto was_canceled(StopToken& stop)
     return [&stop]() { return stop.stop_requested(); };
 }
 
-std::string to_string(JobIssue issue) {
-    switch (issue) {
-    case JobIssue::no_shape: return "no shape";
-    case JobIssue::no_surface: return "no surface";
-    case JobIssue::default_volume: return "default volume";
-    case JobIssue::canceled: return "canceled";
-    default: return "unknown issue";
-    };
-}
-
 /////////////////
 /// Create Volume
 CreateVolumeJob::CreateVolumeJob(DataCreateVolume&& input) : m_input(std::move(input))
@@ -693,7 +683,6 @@ bool check(const CreateVolumeParams& input)
 
 bool check(const DataCreateVolume& input)
 {
-    bool check_fontfile = false;
     assert(input.base.tri_mesh.shape_provider != nullptr);
     bool res = input.base.tri_mesh.shape_provider != nullptr;
     res &= check(input.volume_type);
@@ -702,7 +691,6 @@ bool check(const DataCreateVolume& input)
 
 bool check(const DataCreateObject& input)
 {
-    bool check_fontfile = false;
     assert(input.base.tri_mesh.shape_provider != nullptr);
     bool res = input.base.tri_mesh.shape_provider != nullptr;
     return res;
@@ -944,14 +932,6 @@ void final_update_volume(Domain::TriangleMesh&& mesh, UpdateVolumeParams& data)
     }
 
     UpdateJob::update_volume(volume, std::move(mesh), data.base, data.instance_id);
-}
-
-const Domain::ModelInstance* find_instance(const Domain::Project& project, const Domain::ObjectID& instance_id) {
-    for(const Domain::ModelObject* object: project.model().objects)
-        for (const Domain::ModelInstance* instance : object->instances) 
-            if(instance->id() == instance_id)
-                return instance;
-    return nullptr;
 }
 
 void create_volume(Domain::TriangleMesh&& mesh, const Domain::ObjectID& instance_id, const Domain::ModelVolumeType type, const Domain::Transform3d& trmat, const BaseData& data)

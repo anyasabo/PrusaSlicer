@@ -104,8 +104,9 @@ struct Branch;
 
 struct Bifurcation
 {
-    Branch     *branch;
-    double      area;
+    // Null for the down bifurcation of a root branch.
+    Branch     *branch { nullptr };
+    double      area   { 0. };
 };
 
 // Single branch of a tree.
@@ -127,7 +128,7 @@ struct Branch
 
     // How many of the thick up branches are considered continuation of the trunk?
     // These will be smoothed out together.
-    size_t                  num_up_trunk;
+    size_t                  num_up_trunk { 0 };
 
     bool has_root() const { return this->down.branch == nullptr; }
     bool has_tip()  const { return this->up.empty(); }
@@ -506,8 +507,8 @@ void triangulate_fan(indexed_triangle_set &its, int ifan, int ibegin, int iend)
 {
     // at least 3 vertices, increasing order.
     assert(ibegin + 3 <= iend);
-    assert(ibegin >= 0 && iend <= its.vertices.size());
-    assert(ifan >= 0 && ifan < its.vertices.size());
+    assert(ibegin >= 0 && size_t(iend) <= its.vertices.size());
+    assert(ifan >= 0 && size_t(ifan) < its.vertices.size());
     int num_faces = iend - ibegin;
     its.indices.reserve(its.indices.size() + num_faces * 3);
     for (int v = ibegin, u = iend - 1; v < iend; u = v ++) {
@@ -522,9 +523,9 @@ static void triangulate_strip(indexed_triangle_set &its, int ibegin1, int iend1,
 {
     // at least 3 vertices, increasing order.
     assert(ibegin1 + 3 <= iend1);
-    assert(ibegin1 >= 0 && iend1 <= its.vertices.size());
+    assert(ibegin1 >= 0 && size_t(iend1) <= its.vertices.size());
     assert(ibegin2 + 3 <= iend2);
-    assert(ibegin2 >= 0 && iend2 <= its.vertices.size());
+    assert(ibegin2 >= 0 && size_t(iend2) <= its.vertices.size());
     int n1 = iend1 - ibegin1;
     int n2 = iend2 - ibegin2;
     its.indices.reserve(its.indices.size() + (n1 + n2) * 3);

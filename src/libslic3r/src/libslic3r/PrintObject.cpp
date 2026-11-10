@@ -799,7 +799,9 @@ bool PrintObject::invalidate_step(FDMPrintObjectStep step)
 bool PrintObject::invalidate_all_steps()
 {
 	// First call the "invalidate" functions, which may cancel background processing.
-    bool result = Inherited::invalidate_all_steps() | m_print->invalidate_all_steps();
+    // Both calls must run: no short-circuit evaluation.
+    bool result = Inherited::invalidate_all_steps();
+    result |= m_print->invalidate_all_steps();
 	// Then reset some of the depending values.
 	m_slicing_params.valid = false;
 	return result;

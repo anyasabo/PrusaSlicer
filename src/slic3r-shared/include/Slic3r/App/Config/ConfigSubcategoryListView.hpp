@@ -51,14 +51,11 @@ protected:
     void on_data_update() override;
 
 private:
-    Biz::IConfigBoxSetter& m_cbi_container;
     Biz::ConfigBoxInteractor& m_cbi;
-    size_t m_cbi_index{0};
 
     Biz::UnsharedPointer<
         Biz::ObservableListSortFilter<Biz::ConfigItemContext, Domain::ConfigItemDef::OptionGroup>>
         m_category_filter;
-    Yoga::Rectangle* m_background{nullptr};
     Domain::ConfigItemDef::Category m_category{Domain::ConfigItemDef::Category::Unknown};
 };
 

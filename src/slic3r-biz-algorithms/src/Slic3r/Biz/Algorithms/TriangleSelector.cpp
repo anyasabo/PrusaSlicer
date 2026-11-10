@@ -2122,7 +2122,7 @@ void TriangleSelector::seed_fill_unselect_all_triangles()
 }
 
 void TriangleSelector::seed_fill_unselect_triangle(const int facet_idx) {
-    assert(facet_idx > 0 && facet_idx < m_triangles.size());
+    assert(facet_idx > 0 && size_t(facet_idx) < m_triangles.size());
     Triangle &triangle = m_triangles[facet_idx];
 
     assert(!triangle.is_split());
@@ -2149,7 +2149,7 @@ void TriangleSelector::seed_fill_apply_on_triangles(TriangleStateType new_state)
 }
 
 void TriangleSelector::seed_fill_apply_on_single_triangle(TriangleStateType new_state, const int facet_idx) {
-    assert(facet_idx > 0 && facet_idx < m_triangles.size());
+    assert(facet_idx > 0 && size_t(facet_idx) < m_triangles.size());
 
     if (Triangle &triangle = m_triangles[facet_idx]; !triangle.is_split() && triangle.is_selected_by_seed_fill()) {
         triangle.set_state(new_state);

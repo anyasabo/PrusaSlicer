@@ -127,7 +127,7 @@ void ToolRowControl::on_data_update()
             m_icon_container->remove_later(icon);
         }
         m_extruders.clear();
-        for (size_t index : std::as_const(m_last_indexes)) {
+        for ([[maybe_unused]] size_t index : std::as_const(m_last_indexes)) {
             ExtruderButton* button =
                 m_icon_container->emplace_back<ExtruderButton>(m_extruder_clicked_fn);
             m_extruders.emplace_back(button);

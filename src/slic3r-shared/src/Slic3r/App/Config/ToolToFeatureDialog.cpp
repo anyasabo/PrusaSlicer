@@ -99,7 +99,6 @@ ToolToFeatureDialog::ToolToFeatureDialog(
     Navigator& navigator
 ) :
     Dialog({Biz::_u8L("Extruder Assignment")}, "ExtruderAssignmentDialog"),
-    m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
     content()->set_min_width(350_fpx);

@@ -214,7 +214,6 @@ private:
     ActualSpeedPlotData m_actual_speed_plot_data;
     LegendParams m_legend_params;
 
-    float m_legend_height{ 0.0f };
     Biz::libpgcode::UnitsSystem m_units{ Biz::libpgcode::UnitsSystem::SI };
 
     bool m_extrusion_roles_colors_popup_visible{ false };

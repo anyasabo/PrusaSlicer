@@ -34,9 +34,6 @@ class ArrangeGizmo final :
 public:
     ArrangeGizmo(
         Biz::ArrangeInteractor& arrange_interactor,
-        Render::Device& device,
-        Scene::ISceneProvider& scene_provider,
-        Scene::GeometryDataFactory& data_factory,
         Biz::ProjectInteractor& project_interactor,
         const Domain::Workbench& workbench
     );
@@ -76,9 +73,6 @@ public:
 
 private:
     Biz::ArrangeInteractor& m_arrange_interactor;
-    Render::Device& m_device;
-    Scene::ISceneProvider& m_scene_provider;
-    Scene::GeometryDataFactory& m_data_factory;
     Biz::ProjectInteractor& m_project_interactor;
     const Domain::Workbench& m_workbench;
     Yoga::Passthrough<ArrangeDialog> m_dialog;

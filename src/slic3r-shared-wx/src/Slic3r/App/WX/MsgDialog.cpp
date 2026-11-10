@@ -128,24 +128,6 @@ static void add_msg_content(MsgDialog* parent, wxBoxSizer* content_sizer, const 
 {
     wxHtmlWindow* html = new wxHtmlWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
 
-    // count lines in the message
-    int msg_lines = 0;
-    if (!content.is_monospaced_font) {
-        int line_len = 55;// count of symbols in one line
-        int start_line = 0;
-        for (auto i = content.msg.begin(); i != content.msg.end(); ++i) {
-            if (*i == '\n') {
-                int cur_line_len = i - content.msg.begin() - start_line;
-                start_line = i - content.msg.begin();
-                if (cur_line_len == 0 || line_len > cur_line_len)
-                    msg_lines++;
-                else
-                    msg_lines += std::lround((double)(cur_line_len) / line_len);
-            }
-        }
-        msg_lines++;
-    }
-
     wxFont      font = w_config()->normal_font();//wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = w_config()->code_font();
     wxColour    text_clr = w_config()->get_label_clr_default();

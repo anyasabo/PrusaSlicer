@@ -74,8 +74,6 @@ private:
 class LoopEvents
 {
 public:
-    explicit LoopEvents(RootItem& root_item);
-
     void insert_event(EventPtr event);
 
     /**
@@ -84,7 +82,6 @@ public:
     unsigned int process_events();
 
 private:
-    RootItem& m_root_item;
     std::list<EventPtr> m_events;
 };
 

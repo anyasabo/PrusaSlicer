@@ -157,6 +157,7 @@ std::string location_label(const Domain::ConfigLocation& location)
                 case Domain::SLAConfigLocation::Material: return Biz::_u8L("Material settings");
                 case Domain::SLAConfigLocation::Print: return Biz::_u8L("Print settings");
                 case Domain::SLAConfigLocation::Object: return Biz::_u8L("Object settings");
+                case Domain::SLAConfigLocation::Project: return Biz::_u8L("Project settings");
                 case Domain::SLAConfigLocation::MacroOverrides: return Biz::_u8L("Mode override");
                 case Domain::SLAConfigLocation::None: return {};
                 }

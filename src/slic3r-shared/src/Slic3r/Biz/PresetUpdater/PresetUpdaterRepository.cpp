@@ -154,7 +154,6 @@ bool OnlinePresetUpdaterRepository::get_file_inner(
 ) const
 {
     boost::uuids::random_generator generator;
-    boost::uuids::uuid uuid = generator();
 
     bool res          = false;
     fs::path tmp_path = target_path;

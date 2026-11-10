@@ -1851,7 +1851,7 @@ PrusaFilesResult Slic3r::load_prusa_files(
     PrusaFilesResult result;
     result.used_file_indices = std::vector<bool>(archive.get_num_files(), {false});
 
-    auto get_json = [&archive, &collected_issues, &result](const char *filename, RT err_type)->std::optional<json> {
+    auto get_json = [&archive, &collected_issues](const char *filename, RT err_type)->std::optional<json> {
         tl::expected<ResultLoadJson, Read3mfIssue> result_json = load_json(archive, filename, err_type);
         if (! result_json)
             collected_issues.add_issue(result_json.error());

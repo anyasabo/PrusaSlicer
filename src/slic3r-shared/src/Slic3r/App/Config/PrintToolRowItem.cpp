@@ -49,13 +49,11 @@ protected:
 PrintToolRowItem::PrintToolRowItem(
     size_t index,
     const Biz::PrintToolItem& data,
-    Biz::PrintToolConfigBoxInteractor& cbi,
     Biz::IConfigBoxSetter& cb_setter,
     Biz::ProjectInteractor& project_interactor,
     const PrintToolRowItemDisplayOptions& options
 ) :
     Biz::DataObserver<Biz::PrintToolItem>(index, data),
-    m_cbi(cbi),
     m_cb_setter(cb_setter),
     m_project_interactor(project_interactor),
     m_options(options),

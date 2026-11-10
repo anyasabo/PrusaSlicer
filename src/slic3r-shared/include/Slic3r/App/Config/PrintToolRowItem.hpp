@@ -48,7 +48,6 @@ public:
     PrintToolRowItem(
         size_t index,
         const Biz::PrintToolItem& data,
-        Biz::PrintToolConfigBoxInteractor& cbi,
         Biz::IConfigBoxSetter& cb_setter,
         Biz::ProjectInteractor& project_interactor,
         const PrintToolRowItemDisplayOptions& options = {}
@@ -124,7 +123,6 @@ private:
     };
     InitializedType m_initialized_type{InitializedType::None};
 
-    Biz::PrintToolConfigBoxInteractor& m_cbi;
     Biz::IConfigBoxSetter& m_cb_setter;
     Biz::ProjectInteractor& m_project_interactor;
 
@@ -154,7 +152,6 @@ private:
     std::vector<ToolRowOverridePtr> m_overrides;
 
     ConfigRowItem* m_config_row_item{nullptr};
-    bool m_small{false};
 };
 
 } // namespace Slic3r::App

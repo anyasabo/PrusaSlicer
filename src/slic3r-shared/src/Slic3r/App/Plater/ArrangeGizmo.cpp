@@ -71,16 +71,10 @@ get_auxiliary_travel_anchor(const Project& project, const BedSelection& selectio
 
 ArrangeGizmo::ArrangeGizmo(
     Biz::ArrangeInteractor& arrange_interactor,
-    Render::Device& device,
-    Scene::ISceneProvider& scene_provider,
-    Scene::GeometryDataFactory& data_factory,
     Biz::ProjectInteractor& project_interactor,
     const Domain::Workbench& workbench
 ) :
     m_arrange_interactor{arrange_interactor},
-    m_device{device},
-    m_scene_provider{scene_provider},
-    m_data_factory{data_factory},
     m_project_interactor{project_interactor},
     m_workbench{workbench},
     m_dialog(

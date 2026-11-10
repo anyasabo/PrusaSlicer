@@ -85,7 +85,6 @@ public:
 
         std::string m_preset_name;
 
-        Domain::PrinterTechnology m_printer_technology{Domain::PrinterTechnology::FFF};
         ValidationType m_valid_type{ValidationType::Invalid};
         SavePresetDialog* m_dialog{nullptr};
         wxWindow* m_parent{nullptr};
@@ -160,8 +159,6 @@ private:
 
     wxScrolledWindow* m_scrolled_panel{nullptr};
     wxBoxSizer* m_presets_sizer{nullptr};
-    wxStaticText* m_label{nullptr};
-    wxBoxSizer* m_radio_sizer{nullptr};
     wxCheckBox* m_template_filament_checkbox{nullptr};
 
     std::string m_ph_printer_name;

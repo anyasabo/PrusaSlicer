@@ -23,9 +23,7 @@ OverridableSubcategoryListView::OverridableSubcategoryListView(
         OverridableSubcategoryListViewFactory,
         ScrollArea>(OverridableSubcategoryListViewFactory{cbi_container, cbi, cbi_index}),
     Biz::DataObserver<Biz::OverrideItem>(index, data),
-    m_cbi_container(cbi_container),
     m_cbi(cbi),
-    m_cbi_index(cbi_index),
     m_category_filter(
         std::make_shared<
             Biz::ObservableListSortFilter<Biz::OverrideItem, Domain::ConfigItemDef::OptionGroup>>()

@@ -21,7 +21,6 @@ void ObjectListProjectContext::
 }
 
 ObjectListInteractor::ObjectListInteractor(Scene::SceneInteractor& scene_interactor) :
-    m_scene_interactor(scene_interactor),
     m_config_container_list_changed_listener_scope(scene_interactor, *this)
 {}
 

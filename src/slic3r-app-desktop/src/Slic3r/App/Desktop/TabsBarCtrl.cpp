@@ -327,7 +327,6 @@ void TabsBarCtrl::Button::render()
                     pt.y = (rc.height - labelSize.y) * 0.5;
                 dc.DrawText(text, pt);
             } else {
-                int max_width         = 0;
                 const int line_height = GetCharHeight();
                 for (const wxString& line : lines) {
                     wxSize labelSize = dc.GetTextExtent(line);

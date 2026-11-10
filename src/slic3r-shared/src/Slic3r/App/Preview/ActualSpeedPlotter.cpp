@@ -8,7 +8,6 @@ namespace Slic3r::App::Preview {
 
 static const ImVec4 GRID_MAIN_COLOR      = { 0.5f, 0.5f, 0.5f, 0.5f };
 static const ImVec4 GRID_SECONDARY_COLOR = { 0.0f, 0.0f, 0.5f, 0.5f };
-static const ImVec4 PROFILE_BASE_COLOR   = { 0.8f, 0.8f, 0.8f, 1.0f };
 
 int plot_actual_speed_profile(const ActualSpeedPlotData& data, const ImVec2& size)
 {

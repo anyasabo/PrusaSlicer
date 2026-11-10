@@ -265,7 +265,6 @@ private:
     Yoga::Item* m_bottom_bar            = nullptr;
     WarningPanel* m_warning_panel       = nullptr;
     Yoga::ScrollArea* m_content         = nullptr;
-    size_t m_current_tab_index          = 0;
 
     std::vector<Yoga::LayoutButton*> m_tab_buttons;
     Yoga::ButtonGroup m_tab_button_group;

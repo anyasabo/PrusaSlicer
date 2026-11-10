@@ -21,7 +21,6 @@ namespace {
 // Constants
 constexpr double SURFACE_DISTANCE_STEP = 0.01;
 constexpr double ANGLE_DEG_STEP        = .1;
-constexpr double ANGLE_RAD_STEP        = .01;
 } // namespace
 
 namespace Slic3r::App::Plater {

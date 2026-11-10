@@ -58,8 +58,6 @@ Event::ChangeList MoveEvent::process()
     };
 }
 
-LoopEvents::LoopEvents(RootItem& root_item) : m_root_item(root_item) {}
-
 void LoopEvents::insert_event(EventPtr event)
 {
     ASSERT(event);

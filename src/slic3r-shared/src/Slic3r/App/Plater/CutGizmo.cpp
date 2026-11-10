@@ -1613,7 +1613,7 @@ void CutGizmo::update_cut_plane_mesh()
 
     const auto& trimesh = m_model_triangle_mesh_manager.get_or_create(
         id,
-        [&, this]() -> std::unique_ptr<Scene::TriangleMesh>
+        [&]() -> std::unique_ptr<Scene::TriangleMesh>
         { return std::make_unique<Scene::TriangleMesh>(std::move(its)); }
     );
     const auto* geom = m_model_geometry_manager.get_or_create(
@@ -2609,7 +2609,7 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
 {
     std::vector<std::string> err_objects_names;
     std::vector<int> err_objects_idxs;
-    int obj_idx{0};
+    [[maybe_unused]] int obj_idx{0};
     for (const ModelObject* object : objects) {
         std::vector<std::string> connectors_names;
         connectors_names.reserve(object->volumes.size());

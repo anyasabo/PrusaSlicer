@@ -137,9 +137,6 @@ private:
 
     VolumesButton* m_volumes_button{nullptr};
     VolumeListView* m_volumes_list_view{nullptr};
-
-    size_t m_object_id;
-    Biz::ProjectInteractor& m_project_interactor;
 };
 
 } // namespace ObjectList

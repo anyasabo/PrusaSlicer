@@ -79,7 +79,6 @@ private:
     ObjectListProjectContext& context(Domain::SelectionId project_id);
     void refresh(Domain::SelectionId project_id);
 
-    Scene::SceneInteractor& m_scene_interactor;
     Biz::ProjectInteractor* m_project_interactor{nullptr};
 
     ListenerScope<IConfigContainerListChangedListener, Scene::SceneInteractor, ObjectListInteractor>

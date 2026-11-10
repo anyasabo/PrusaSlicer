@@ -15,12 +15,10 @@ OverridableConfigRowItem::OverridableConfigRowItem(
     size_t index,
     const Biz::OverrideItem& data,
     Biz::IConfigBoxSetter& cb_setter,
-    Biz::OverridableConfigBoxInteractor& cbi,
     size_t cbi_index
 ) :
     Biz::DataObserver<Biz::OverrideItem>(index, data),
     m_cb_setter(cb_setter),
-    m_cbi(cbi),
     m_cbi_index(cbi_index)
 {
     set_orientation(Orientation::Horizontal);

@@ -245,8 +245,6 @@ ColorMixDialog::ColorMixDialog(
     m_selected_config_container_changed_listener_scope(project_interactor, *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
-    m_extruder_filters(std::make_shared<ObservableList<ExtruderFilterData>>()),
-
     m_blend_candidates(std::make_shared<ObservableList<BlendTileData>>()),
     m_blend_preset_filter(
         std::make_shared<BlendPresetSortFilter>(
@@ -254,6 +252,7 @@ ColorMixDialog::ColorMixDialog(
             { return this->is_extruder_enabled(extruder_id_1based); }
         )
     ),
+    m_extruder_filters(std::make_shared<ObservableList<ExtruderFilterData>>()),
     m_two_color_presets(std::make_shared<ObservableListSortFilter<BlendTileData>>()),
     m_three_color_presets(std::make_shared<ObservableListSortFilter<BlendTileData>>()),
     m_recipe_rows(std::make_shared<ObservableList<RecipeRowData>>())

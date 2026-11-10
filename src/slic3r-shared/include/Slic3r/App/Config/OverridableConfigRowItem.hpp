@@ -31,7 +31,6 @@ public:
         size_t index,
         const Biz::OverrideItem& data,
         Biz::IConfigBoxSetter& cb_setter,
-        Biz::OverridableConfigBoxInteractor& cbi,
         size_t cbi_index
     );
 
@@ -43,7 +42,6 @@ protected:
 
 private:
     Biz::IConfigBoxSetter& m_cb_setter;
-    Biz::OverridableConfigBoxInteractor& m_cbi;
     size_t m_cbi_index{0};
 
     bool m_last_is_override{false};

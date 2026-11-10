@@ -52,7 +52,9 @@ private:
     std::vector<std::string> m_script_message_hadler_names;
 
 
+#ifndef __linux__
     bool m_busy_cursor_set {false};
+#endif // !__linux__
     bool m_load_error_page{false};
     bool m_shown{false};
     bool m_load_default_url_on_next_error{false};

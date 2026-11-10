@@ -234,9 +234,8 @@ Polygons create_voronoi_cells_cgal(const Points &points, coord_t max_distance) {
     //}
 
     Polygons cells(points.size());
-    size_t fit_index = 0;
     // Loop over the faces of the Voronoi diagram in order of given points
-    for (VD::Face_iterator fit = vd.faces_begin(); fit != vd.faces_end(); ++fit, ++fit_index) {
+    for (VD::Face_iterator fit = vd.faces_begin(); fit != vd.faces_end(); ++fit) {
         // get source point index
         // TODO: do it without search !!!
         Point_2 source_point = fit->dual()->point();

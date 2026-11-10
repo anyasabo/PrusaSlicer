@@ -46,7 +46,7 @@ void DiffViewCtrl::AppendBmpTextColumn(const wxString& label, unsigned model_col
 #ifdef __linux__
     wxDataViewIconTextRenderer* rd = new wxDataViewIconTextRenderer();
     rd->EnableMarkup(true);
-    wxDataViewColumn* column = new wxDataViewColumn(label, rd, model_column, width * m_em_unit, wxALIGN_TOP, wxDATAVIEW_COL_RESIZABLE | wxDATAVIEW_CELL_INERT);
+    wxDataViewColumn* column = new wxDataViewColumn(label, rd, model_column, width * m_em_unit, wxALIGN_TOP, wxDATAVIEW_COL_RESIZABLE);
 #else
     wxDataViewColumn* column = new wxDataViewColumn(label, new BitmapTextRenderer(true, wxDATAVIEW_CELL_INERT), model_column, width * m_em_unit, wxALIGN_TOP, wxDATAVIEW_COL_RESIZABLE);
 #endif //__linux__

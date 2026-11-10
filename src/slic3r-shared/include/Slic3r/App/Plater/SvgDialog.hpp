@@ -115,8 +115,6 @@ private:
     bool m_use_deg  = true;
 
     Callbacks m_callbacks;
-
-    bool m_set_debug = false;
 };
 
 } // namespace Slic3r::App::Plater

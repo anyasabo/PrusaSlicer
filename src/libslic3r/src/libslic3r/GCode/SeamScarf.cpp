@@ -320,7 +320,7 @@ std::pair<GCode::SmoothPath, std::size_t> add_scarf_seam(
         Impl::get_path_point(paths, scarf.end_point, scarf.end_point_previous_index)};
 
     const ExtrusionPath &path{paths[end_point.path_index]};
-    if (end_point.previous_point_on_path_index == static_cast<int>(path.size()) - 1) {
+    if (end_point.previous_point_on_path_index + 1 == path.size()) {
         // Last point of the path is picked. This is invalid for splitting.
         if (static_cast<int>(end_point.path_index) < static_cast<int>(paths.size()) - 2) {
             // First point of next path and last point of previous path should be the same.

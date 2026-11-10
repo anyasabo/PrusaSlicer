@@ -8,7 +8,7 @@
 
 namespace Slic3r::App::Yoga {
 
-RootItem::RootItem() : m_loop_events(*this)
+RootItem::RootItem()
 {
     set_object_name("RootItem");
 }

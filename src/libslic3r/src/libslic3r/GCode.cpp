@@ -1473,7 +1473,7 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
         } else {
             const std::vector<std::string>& end_filament_gcode{
                 print.config().get<std::vector<std::string>>("end_filament_gcode")};
-            for (int extruder_id{}; extruder_id < end_filament_gcode.size(); ++extruder_id) {
+            for (int extruder_id{}; extruder_id < int(end_filament_gcode.size()); ++extruder_id) {
                 config.set("filament_extruder_id", extruder_id);
                 file.writeln(this->placeholder_parser_process(
                     "end_filament_gcode",
@@ -2875,7 +2875,7 @@ LayerResult GCodeGenerator::process_layer(
         }
 
         if (has_custom_gcode_to_emit && extruder_id_for_custom_gcode == int(extruder_extrusions.extruder_id)) {
-            assert(m_writer.extruder()->id() == extruder_id_for_custom_gcode);
+            assert(int(m_writer.extruder()->id()) == extruder_id_for_custom_gcode);
             assert(m_pending_pre_extrusion_gcode.empty());
             // Now we have picked the right extruder, so we can emit the custom g-code.
             gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());

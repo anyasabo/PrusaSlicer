@@ -204,8 +204,8 @@ FileDownloaderJobData perform_job(
                     }
                     double percent_total = job_data.absolute_size == 0 ?
                         0.0 :
-                        (written_previously + progress.dlnow) / job_data.absolute_size;
-                    double aux = percent_total;
+                        double(written_previously + progress.dlnow) / double(job_data.absolute_size);
+                    [[maybe_unused]] double aux = percent_total;
                     percent_total = job_data.percent_from + percent_total * (job_data.percent_to - job_data.percent_from);
                     //SPDLOG_DEBUG("percent: {} ({} + {} * {})", percent_total, job_data.percent_from ,aux, (job_data.percent_to - job_data.percent_from));
                     job_progress.set({percent_total});
@@ -293,7 +293,7 @@ FileDownloaderJobData perform_job(
     if (!success) {
         throw FileDownloadFailed{""};
     }
-    return std::move(job_data);
+    return job_data;
 }
 
 } // namespace Slic3r::Biz::FileDownloader

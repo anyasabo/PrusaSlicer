@@ -782,9 +782,9 @@ indexed_triangle_set cut2model(const SurfaceCut& cut, const Biz::Algorithms::IPr
         assert(i[0] + back_offset < result.vertices.size());
         assert(i[1] + back_offset < result.vertices.size());
         assert(i[2] + back_offset < result.vertices.size());
-        assert(i[0] >= 0 && i[0] < cut.vertices.size());
-        assert(i[1] >= 0 && i[1] < cut.vertices.size());
-        assert(i[2] >= 0 && i[2] < cut.vertices.size());
+        assert(i[0] >= 0 && size_t(i[0]) < cut.vertices.size());
+        assert(i[1] >= 0 && size_t(i[1]) < cut.vertices.size());
+        assert(i[2] >= 0 && size_t(i[2]) < cut.vertices.size());
         // Y and Z is swapped CCW triangles for back side
         result.indices.emplace_back(
             Index3{

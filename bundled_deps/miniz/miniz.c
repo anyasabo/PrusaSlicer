@@ -7939,12 +7939,13 @@ mz_uint mz_zip_reader_get_filename_from_extra(mz_zip_archive* pZip, mz_uint file
     nf = MZ_READ_LE16(p + MZ_ZIP_CDH_FILENAME_LEN_OFS);
     ne = MZ_READ_LE16(p + MZ_ZIP_CDH_EXTRA_LEN_OFS);
 
-    int copy = 0;
-    char const* p_nf = p + MZ_ZIP_CENTRAL_DIR_HEADER_SIZE + nf;
-    char const* e = p_nf + ne + 1;
+    /* Unsigned bytes: with a signed char, a length byte of 0x80 or more gives a wrong length. */
+    const mz_uint8* p_nf = p + MZ_ZIP_CENTRAL_DIR_HEADER_SIZE + nf;
+    const mz_uint8* e = p_nf + ne + 1;
     while (p_nf + 4 < e) {
-        mz_uint16 len = ((mz_uint16)p_nf[2]) | ((mz_uint16)p_nf[3] << 8);
-        if (p_nf[0] == '\x75' && p_nf[1] == '\x70' && len >= 5 && p_nf + 4 + len < e && p_nf[4] == '\x01') {
+        mz_uint16 len = MZ_READ_LE16(p_nf + 2);
+        /* The Info-ZIP Unicode Path extra field (0x7075), version 1. */
+        if (p_nf[0] == 0x75 && p_nf[1] == 0x70 && len >= 5 && p_nf + 4 + len < e && p_nf[4] == 0x01) {
             mz_uint length = MZ_MIN((mz_uint)len - 5, extra_buf_size - 1);
             memcpy(buffer, p_nf + 9, length);
             return length;

@@ -18,10 +18,10 @@ BeadingStrategy::BeadingStrategy(coord_t optimal_width, double wall_split_middle
 }
 
 BeadingStrategy::BeadingStrategy(const BeadingStrategy &other)
-    : optimal_width(other.optimal_width)
+    : name(other.name)
+    , optimal_width(other.optimal_width)
     , wall_split_middle_threshold(other.wall_split_middle_threshold)
     , wall_add_middle_threshold(other.wall_add_middle_threshold)
-    , name(other.name)
     , default_transition_length(other.default_transition_length)
     , transitioning_angle(other.transitioning_angle)
 {}

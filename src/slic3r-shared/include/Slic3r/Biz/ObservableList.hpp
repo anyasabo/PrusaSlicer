@@ -33,7 +33,7 @@ public:
     {
         ASSERT(index_range.is_valid() && index_range.to < m_data_items.size());
 
-        this->template invoke_listeners<IListObserver<Data>>([this, index_range](auto* l) {
+        this->template invoke_listeners<IListObserver<Data>>([index_range](auto* l) {
             l->on_will_be_removed(index_range);
         });
 

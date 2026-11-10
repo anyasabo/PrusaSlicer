@@ -228,7 +228,7 @@ static void find_keys_with_many_children_recursive(const nlohmann::ordered_json&
         for (const auto& item : j.items()) {
             const std::string& key = item.key();
             const nlohmann::ordered_json& value = item.value();
-            if (value.size() >= min_children)
+            if (value.size() >= size_t(min_children))
                 result.emplace_back(key, level);
             else
                 find_keys_with_many_children_recursive(value, min_children, level + 1, result);
@@ -269,7 +269,7 @@ std::string beautify_json(
         std::string line_start = "\"" + it->first;
         int box_indent_level = it->second;
 
-        if (lines[line_id].find(line_start) == box_indent_level * indent) {
+        if (lines[line_id].find(line_start) == size_t(box_indent_level * indent)) {
             int box_indent = box_indent_level * indent;
             size_t i = line_id + 1;
             while (true) {

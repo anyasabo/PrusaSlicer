@@ -845,7 +845,7 @@ public:
                 m_ifs.seekg(m_file_pos, m_ifs.beg);
                 if (! m_ifs.read(m_block.data(), m_block_len))
                     return false;
-                assert(m_block_len == m_ifs.gcount());
+                assert(m_block_len == size_t(m_ifs.gcount()));
             }
 
             assert(m_block_len > 0);

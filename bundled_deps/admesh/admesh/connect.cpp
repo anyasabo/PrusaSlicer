@@ -480,7 +480,7 @@ void stl_check_facets_nearby(stl_file *stl, float tolerance)
 {
 	assert(stl->stats.connected_facets_3_edge <= stl->stats.connected_facets_2_edge);
 	assert(stl->stats.connected_facets_2_edge <= stl->stats.connected_facets_1_edge);
-	assert(stl->stats.connected_facets_1_edge <= stl->stats.number_of_facets);
+	assert(stl->stats.connected_facets_1_edge <= int(stl->stats.number_of_facets));
 
   	if (stl->stats.connected_facets_3_edge == int(stl->stats.number_of_facets))
     	// No need to check any further.  All facets are connected.

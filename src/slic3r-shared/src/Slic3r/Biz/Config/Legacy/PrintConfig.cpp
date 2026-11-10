@@ -5414,7 +5414,7 @@ void DynamicPrintConfig::normalize_fdm()
         const int    extruder      = this->opt<ConfigOptionInt>("bed_temperature_extruder")->value;
 
         // Replace invalid values with 0.
-        if (extruder < 0 || extruder > num_extruders) {
+        if (extruder < 0 || size_t(extruder) > num_extruders) {
             this->option("bed_temperature_extruder")->setInt(0);
         }
     }

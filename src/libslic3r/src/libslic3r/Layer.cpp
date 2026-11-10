@@ -256,13 +256,13 @@ static void connect_layer_slices(
                     assert(assert_intersection_valid(i, j));
                     i -= m_offset_below;
                     j -= m_offset_above;
-                    assert(i >= 0 && i < m_below.lslices_ex.size());
-                    assert(j >= 0 && j < m_above.lslices_ex.size());
+                    assert(i >= 0 && size_t(i) < m_below.lslices_ex.size());
+                    assert(j >= 0 && size_t(j) < m_above.lslices_ex.size());
                     found = true;
                 }
                 if (found) {
-                    assert(i >= 0 && i < m_below.lslices_ex.size());
-                    assert(j >= 0 && j < m_above.lslices_ex.size());
+                    assert(i >= 0 && size_t(i) < m_below.lslices_ex.size());
+                    assert(j >= 0 && size_t(j) < m_above.lslices_ex.size());
                     // Subtract area of holes from the area of outer contour.
                     double area = ClipperLib_Z::Area(polynode.Contour);
                     for (int icontour = 0; icontour < polynode.ChildCount(); ++ icontour)
@@ -503,14 +503,14 @@ static void connect_layer_slices(
 
 #ifndef NDEBUG
     // Verify that only one directional link is stored: either from bottom slice up or from upper slice down.
-    for (int32_t islice = 0; islice < below.lslices_ex.size(); ++ islice) {
+    for (int32_t islice = 0; islice < int32_t(below.lslices_ex.size()); ++ islice) {
         LayerSlice::Links &links1 = below.lslices_ex[islice].overlaps_above;
         for (LayerSlice::Link &link1 : links1) {
             LayerSlice::Links &links2 = above.lslices_ex[link1.slice_idx].overlaps_below;
             assert(! std::binary_search(links2.begin(), links2.end(), link1, [](auto &l, auto &r){ return l.slice_idx < r.slice_idx; }));
         }
     }
-    for (int32_t islice = 0; islice < above.lslices_ex.size(); ++ islice) {
+    for (int32_t islice = 0; islice < int32_t(above.lslices_ex.size()); ++ islice) {
         LayerSlice::Links &links1 = above.lslices_ex[islice].overlaps_below;
         for (LayerSlice::Link &link1 : links1) {
             LayerSlice::Links &links2 = below.lslices_ex[link1.slice_idx].overlaps_above;

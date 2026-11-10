@@ -70,11 +70,11 @@ void add_triangles(std::vector<stl_triangle_vertex_indices>& result,
         result.reserve(result.size() + 2 * indices.size());
 
         auto convert_index = [&expoly, outer_vertex_offset, &inner_offsets](int i)->int{
-            if (i < expoly.contour.points.size())
+            if (size_t(i) < expoly.contour.points.size())
                 return outer_vertex_offset + i;
             i -= expoly.contour.points.size();
             for (const Domain::Polygon& hole : expoly.holes) {
-                if (i < hole.points.size()) {
+                if (size_t(i) < hole.points.size()) {
                     size_t hole_index = &hole - &expoly.holes.front();
                     // offset of each hole is in inner_offsets
                     // holes order is reverted
@@ -87,7 +87,7 @@ void add_triangles(std::vector<stl_triangle_vertex_indices>& result,
         };        
         auto convert_index2 = [&expoly, &convert_index, outer_count, inner_count](int i)->int {
             return convert_index(i) +
-                ((i < expoly.contour.points.size()) ?
+                ((size_t(i) < expoly.contour.points.size()) ?
                 outer_count : inner_count);
         };
         auto add_offset = [&convert_index](const Domain::Index3& t) {

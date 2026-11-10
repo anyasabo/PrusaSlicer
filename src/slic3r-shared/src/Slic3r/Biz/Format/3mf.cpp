@@ -674,7 +674,7 @@ Loaded3MF load_3mf(const std::string& filepath_3mf)
     PrusaFilesResult prusa_files_result = load_prusa_files(archive, model_map, collected_issues);
 
     std::vector<bool>& used_files = prusa_files_result.used_file_indices;
-    assert(used_files.size() == archive.get_num_files());
+    assert(used_files.size() == size_t(archive.get_num_files()));
     assert(used_files.size() == loaded_model.used_files.size());
     for (size_t i = 0; i < loaded_model.used_files.size(); ++i)
         if (loaded_model.used_files[i]) {

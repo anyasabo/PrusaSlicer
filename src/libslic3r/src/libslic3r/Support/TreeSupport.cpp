@@ -2647,7 +2647,7 @@ static void remove_deleted_elements(std::vector<SupportElements> &move_bounds)
                     // Mark as deleted in the map.
                     map_current[layer.size()] = -1;
                 }
-                assert(i == layer.size() || i + 1 < layer.size());
+                assert(size_t(i) == layer.size() || size_t(i + 1) < layer.size());
                 if (i + 1 < int32_t(layer.size())) {
                     element = std::move(layer.back());
                     layer.pop_back();                    

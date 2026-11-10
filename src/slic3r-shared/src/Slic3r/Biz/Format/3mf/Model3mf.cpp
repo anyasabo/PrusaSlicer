@@ -1320,12 +1320,12 @@ void store_geometry(ZipSink &sink, const indexed_triangle_set &its, std::string 
         assert(unused_vertex_write(t));
 
         // check range of vertex adress
-        assert(t[0] >= 0 && t[0] < vertices_count);
-        assert(t[1] >= 0 && t[1] < vertices_count);
-        assert(t[2] >= 0 && t[2] < vertices_count);
-        return t[0] >= 0 && t[0] < vertices_count &&
-               t[1] >= 0 && t[1] < vertices_count &&
-               t[2] >= 0 && t[2] < vertices_count;
+        assert(t[0] >= 0 && size_t(t[0]) < vertices_count);
+        assert(t[1] >= 0 && size_t(t[1]) < vertices_count);
+        assert(t[2] >= 0 && size_t(t[2]) < vertices_count);
+        return t[0] >= 0 && size_t(t[0]) < vertices_count &&
+               t[1] >= 0 && size_t(t[1]) < vertices_count &&
+               t[2] >= 0 && size_t(t[2]) < vertices_count;
     };
 
     // Fills the fixed buffer via the fast, unchecked karma generator - only safe because

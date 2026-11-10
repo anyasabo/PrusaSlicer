@@ -8,6 +8,7 @@
 #include <random>
 
 #include "Slic3r/Platform.hpp"
+#include "Slic3r/Version.hpp"
 #include "Slic3r/Time.hpp"
 #include "Slic3r/LegacyFormat.hpp"
 #include "libslic3r/libslic3r.h"

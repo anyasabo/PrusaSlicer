@@ -1,11 +1,11 @@
-dep_build_jobs(NPROC OpenSSL)
+dep_build_jobs(_openssl_jobs OpenSSL)
 
 set(_conf_cmd "./config")
 set(_cross_arch "")
 set(_cross_comp_prefix_line "")
 set(_apple_target_flags "")
 set(_extra_conf_flags -Wa,--noexecstack)
-set(_bld_cmd make depend && make "-j${NPROC}")
+set(_bld_cmd make depend && make "-j${_openssl_jobs}")
 set(_ins_cmd make install_sw)
 
 if (WIN32)

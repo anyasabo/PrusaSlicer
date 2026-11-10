@@ -55,8 +55,11 @@ elseif (UNIX)
 endif ()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/Slic3r/Version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/Slic3r/Version.hpp @ONLY)
+# The build ID is in a source file of its own: a new build ID then recompiles only this file.
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/Slic3r/BuildId.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/src/Slic3r/BuildId.cpp @ONLY)
 
-add_library(slic3r-base STATIC ${SLIC3R_BASE_FILES} ${CMAKE_CURRENT_BINARY_DIR}/include/Slic3r/Version.hpp)
+add_library(slic3r-base STATIC ${SLIC3R_BASE_FILES} ${CMAKE_CURRENT_BINARY_DIR}/include/Slic3r/Version.hpp
+	${CMAKE_CURRENT_BINARY_DIR}/src/Slic3r/BuildId.cpp)
 # wxString conversions only with explicit encoding stated for all slic3r-* targets
 if ((NOT UNIX) OR APPLE)
 	# The wxNO_IMPLICIT_WXSTRING_ENCODING cannot be used along with wxUSE_UTF8_LOCALE_ONLY which gets defined on Linux

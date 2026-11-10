@@ -31,7 +31,9 @@ gh workflow run "Fork build" -R anyasabo/PrusaSlicer --ref anya/main -f gcc_chec
 ```
 
 Renovate (`renovate.json`) updates the GitHub Actions on `anya/main` only. It does not change `deps/`: a dependency
-update goes to a topic branch for upstream.
+update goes to a topic branch for upstream. Renovate reads `renovate.json` only from the default branch of the
+repository. If `anya/main` is the default branch of the fork, Renovate works. That is not set yet: Anya decides. The same
+setting lets `gh workflow run` start a workflow that is not on `master`. Then also install the Renovate GitHub app.
 
 ## Release
 
@@ -40,5 +42,5 @@ update goes to a topic branch for upstream.
 3. A local build can also upload: `.github/fork/upload-release.sh v3.0.0-alpha14-anya.1` (it uses `gh`).
 
 The version is upstream `SLIC3R_VERSION`, with the suffix after `+` in the build ID (see `version.inc`). The suffix
-comes from the tag: `anya.1`. A build without a tag gets `anya-dev` (the package names add the commit). The build ID
-is in a header that about 150 files include, so a value that changes on each commit makes them miss ccache.
+comes from the tag: `anya.1`. A build without a tag gets `anya-dev.<commit>`. The build ID is in a generated
+`BuildId.cpp` (topic branch `version-header`), so a new commit recompiles only that file.

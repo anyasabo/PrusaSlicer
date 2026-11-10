@@ -32,7 +32,8 @@ on:
         default: false
 
 concurrency:
-  group: fork-build-${{ github.ref }}
+  # The event in the group: a GCC check by hand and a push build do not cancel each other.
+  group: fork-build-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
@@ -53,6 +54,8 @@ env:
 
 jobs:
   build:
+    # A dispatch with gcc_check runs only the GCC check, not the release builds.
+    if: github.event_name != 'workflow_dispatch' || !inputs.gcc_check
     strategy:
       fail-fast: false
       matrix:

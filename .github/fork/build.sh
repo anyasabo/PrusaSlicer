@@ -8,7 +8,8 @@
 #   all   deps, then app.
 #
 # Only these settings are added to doc/Build.md:
-#   CMAKE_BUILD_TYPE=Release, SLIC3R_BUILD_TESTS=OFF and SLIC3R_RELEASE_DEBUG_SYMBOLS=OFF (a release build),
+#   deps: DEP_MAX_THREADS=JOBS and a top level with one job (see build_deps).
+#   app: CMAKE_BUILD_TYPE=Release, SLIC3R_BUILD_TESTS=OFF and SLIC3R_RELEASE_DEBUG_SYMBOLS=OFF (a release build),
 #   CMAKE_INSTALL_PREFIX=build/dist, SLIC3R_FORK_SUFFIX (the version suffix, see version.inc),
 #   on macOS the deployment target 13.3 and -Xclang -fno-pch-timestamp (for ccache), and with clang the ThinLTO cache
 #   of the linker (and lld on Linux).
@@ -18,7 +19,7 @@
 #   JOBS          parallel jobs, also in each dependency build (DEP_MAX_THREADS). Default: all CPUs
 #   DEPS_PREFIX   the CMAKE_PREFIX_PATH of the dependencies. Default: deps/build/destdir/usr/local (doc/Build.md).
 #                 A ';' list is allowed, for prebuilt dependencies (for example the devspace cache).
-#   FORK_SUFFIX   the version suffix (default: from the git tag v<version>-<suffix>, else "anya-dev")
+#   FORK_SUFFIX   the version suffix (default: from the git tag v<version>-<suffix>, else "anya-dev.<commit>")
 #   CMAKE_ARGS    more arguments for the configure of the app (optional)
 # A compiler launcher (ccache) comes from the environment: CMAKE_C_COMPILER_LAUNCHER, CMAKE_CXX_COMPILER_LAUNCHER.
 set -euo pipefail
@@ -46,20 +47,21 @@ fork_suffix() {
     tag=$(git describe --tags --exact-match 2>/dev/null || true)
     case "$tag" in
         v*-anya.*) echo "${tag##*-}" ;;
-        # Not the commit: the build ID is in Slic3r/Version.hpp, which libslic3r.h includes (about 150 files). A new
-        # value on each commit makes all these files miss ccache. The package names get the commit instead.
-        *) echo "anya-dev" ;;
+        # The commit is in the build ID. A new build ID recompiles only BuildId.cpp (branch version-header).
+        *) echo "anya-dev.$(git rev-parse --short=10 HEAD)" ;;
     esac
 }
 
 build_deps() {
     echo "== doc/Build.md step 1: dependencies"
-    # DEP_MAX_THREADS: the job count in each dependency build. Its default is the number of CPUs of the host, also in a
+    # One dependency at a time, and JOBS jobs in each one (DEP_MAX_THREADS). deps/CMakeLists.txt recommends a top level
+    # with one job. doc/Build.md gives no -j, which is one job with Make (Ninja would use all CPUs). JOBS at both levels
+    # can start JOBS x JOBS compilers. The default of DEP_MAX_THREADS is the number of CPUs of the host, also in a
     # container with a CPU quota.
     cmake -S deps -B deps/build -DDEP_MAX_THREADS="$JOBS"
-    cmake --build deps/build -j "$JOBS"
+    cmake --build deps/build -j 1
     echo "== doc/Build.md step 1.1: a second build must do nothing"
-    cmake --build deps/build -j "$JOBS"
+    cmake --build deps/build -j 1
 }
 
 build_app() {

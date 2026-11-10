@@ -2262,7 +2262,8 @@ void MenuCommandRegistrar::register_file_menu_commands()
             {MenuItemName::FileMenu, MenuItemName::SaveProject},
             std::make_unique<UIItemCommand>(
                 CommandName::SaveProject,
-                [this]() { m_project_saver.save_selected_project(); },
+                // false: the user cancelled the file dialog. The menu command has nothing more to do.
+                [this]() { static_cast<void>(m_project_saver.save_selected_project()); },
                 UIItemCommandExtraOpts{
                     .keyboard_shortcuts = Platform::KeyboardShortcuts{Platform::KeyboardShortcut{
                         Platform::KeyModifiers(Platform::KeyModifier::Ctrl),
@@ -2276,7 +2277,7 @@ void MenuCommandRegistrar::register_file_menu_commands()
             {MenuItemName::FileMenu, MenuItemName::SaveProjectAs},
             std::make_unique<UIItemCommand>(
                 CommandName::SaveProjectAs,
-                [this]() { m_project_saver.save_selected_project_as(); },
+                [this]() { static_cast<void>(m_project_saver.save_selected_project_as()); },
                 UIItemCommandExtraOpts{
                     .keyboard_shortcuts = Platform::KeyboardShortcuts{Platform::KeyboardShortcut{
                         Platform::KeyModifiers(Platform::KeyModifier::Ctrl)

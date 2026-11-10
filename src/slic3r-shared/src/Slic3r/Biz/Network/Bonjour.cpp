@@ -125,10 +125,8 @@ struct DnsHeader
 	uint16_t nscount;
 	uint16_t arcount;
 
-	enum
-	{
-		SIZE = 12,
-	};
+	// constexpr, not an anonymous enum: DnsMessage::decode adds it to DnsQuestion::MIN_SIZE.
+	static constexpr size_t SIZE = 12;
 
 	static DnsHeader decode(const std::vector<char> &buffer) {
 		DnsHeader res;
@@ -149,10 +147,7 @@ struct DnsHeader
 
 struct DnsQuestion
 {
-	enum
-	{
-		MIN_SIZE = 5,
-	};
+	static constexpr size_t MIN_SIZE = 5;
 
 	DnsName name;
 	uint16_t type;

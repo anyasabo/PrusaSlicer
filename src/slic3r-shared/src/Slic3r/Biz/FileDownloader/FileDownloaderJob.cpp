@@ -293,7 +293,7 @@ FileDownloaderJobData perform_job(
     if (!success) {
         throw FileDownloadFailed{""};
     }
-    return std::move(job_data);
+    return job_data;
 }
 
 } // namespace Slic3r::Biz::FileDownloader

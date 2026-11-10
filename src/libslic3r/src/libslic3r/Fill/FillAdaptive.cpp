@@ -1401,8 +1401,8 @@ void Filler::_fill_surface_single(
     }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 
-    const auto hook_length     = double(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length)));
-    const auto hook_length_max = double(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length_max)));
+    const auto hook_length     = std::min<double>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length));
+    const auto hook_length_max = std::min<double>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length_max));
 
     Polylines all_polylines_with_hooks = all_polylines.size() > 1 ? connect_lines_using_hooks(std::move(all_polylines), expolygon, this->spacing, hook_length, hook_length_max) : std::move(all_polylines);
 

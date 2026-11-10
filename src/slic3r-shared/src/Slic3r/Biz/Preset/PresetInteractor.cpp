@@ -3543,7 +3543,7 @@ PresetInteractorConfigContainerContext& PresetInteractor::get_or_create_config_c
         return it->second;
 
     PresetInteractorConfigContainerContext ccc{config_container_id};
-    Domain::ConfigContainer& cc = *ASSERT_VAL(project.find_config_container(config_container_id));
+    [[maybe_unused]] Domain::ConfigContainer& cc = *ASSERT_VAL(project.find_config_container(config_container_id));
 
     // TODO: initialize ConfigContainerContext here
 

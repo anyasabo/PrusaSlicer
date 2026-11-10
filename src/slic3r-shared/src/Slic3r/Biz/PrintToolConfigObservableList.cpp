@@ -48,7 +48,6 @@ void PrintToolConfigObservableList::set_sources(
             .value_or(false);
 
     const std::vector<Domain::ConfigItem>& print_items = print_config_box.items.all_items();
-    const std::vector<Domain::ConfigItem>& original_print_items = original_print_config_box->items.all_items();
     if (!m_items.empty()
         && print_items.size() == m_items.size()
         && m_tool_config_boxes.size() == tool_config_boxes.size())

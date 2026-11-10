@@ -683,7 +683,6 @@ bool check(const CreateVolumeParams& input)
 
 bool check(const DataCreateVolume& input)
 {
-    bool check_fontfile = false;
     assert(input.base.tri_mesh.shape_provider != nullptr);
     bool res = input.base.tri_mesh.shape_provider != nullptr;
     res &= check(input.volume_type);
@@ -692,7 +691,6 @@ bool check(const DataCreateVolume& input)
 
 bool check(const DataCreateObject& input)
 {
-    bool check_fontfile = false;
     assert(input.base.tri_mesh.shape_provider != nullptr);
     bool res = input.base.tri_mesh.shape_provider != nullptr;
     return res;

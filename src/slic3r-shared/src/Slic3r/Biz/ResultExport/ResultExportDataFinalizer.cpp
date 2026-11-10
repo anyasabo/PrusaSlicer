@@ -157,7 +157,7 @@ void ResultExportDataFinalizer::dispatch_success(PhysicalPrinter::PhysicalPrinte
 {
     {
         std::lock_guard<std::mutex> lock(m_dispatcher_mutex);
-        bool dispatched = m_dispatcher.dispatch_on_main_thread([this, config = std::move(config),  data = std::move(data)]() mutable {
+        m_dispatcher.dispatch_on_main_thread([this, config = std::move(config),  data = std::move(data)]() mutable {
             this->invoke_listeners<IResultExportBinarizeListener>([&config, &data](auto* listener) mutable {
                 listener->on_result_export_binarize_success(std::move(config), std::move(data));
             }); 
@@ -169,7 +169,7 @@ void ResultExportDataFinalizer::dispatch_fail(const std::string& message)
 {
     {
         std::lock_guard<std::mutex> lock(m_dispatcher_mutex);
-        bool dispatched = m_dispatcher.dispatch_on_main_thread([this, message]() {
+        m_dispatcher.dispatch_on_main_thread([this, message]() {
             this->invoke_listeners<IResultExportBinarizeListener>([message](auto* listener) {
                 listener->on_result_export_binarize_fail(message);
             });

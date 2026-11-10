@@ -2609,7 +2609,7 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
 {
     std::vector<std::string> err_objects_names;
     std::vector<int> err_objects_idxs;
-    int obj_idx{0};
+    [[maybe_unused]] int obj_idx{0};
     for (const ModelObject* object : objects) {
         std::vector<std::string> connectors_names;
         connectors_names.reserve(object->volumes.size());

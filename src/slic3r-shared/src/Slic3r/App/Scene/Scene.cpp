@@ -704,8 +704,6 @@ void Scene::render_ao_gbuffer_pass(Render::Device& device, const Camera& camera,
         return n->has_render_component() && n->render_component()->receive_shadows() && !resolve_material(*n).transparent();
     });
 
-    const Shadows& shadows = s_graphics_settings.m_shadows;
-
     if (!nodes.empty()) {
         if (customizer)
             customizer->on_render_begin(*cmd_buffer);

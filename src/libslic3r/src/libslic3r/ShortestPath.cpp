@@ -1938,7 +1938,7 @@ static inline void improve_ordering_by_two_exchanges_with_segment_flipping(Polyl
 	};
 	double cost_initial = cost();
 
-	static int iRun = 0;
+	[[maybe_unused]] static int iRun = 0;
 	++ iRun;
 #ifdef DEBUG_SVG_OUTPUT
 	svg_draw_polyline_chain("improve_ordering_by_two_exchanges_with_segment_flipping-initial", iRun, polylines);

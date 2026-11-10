@@ -37,7 +37,7 @@ void ResultExportInteractor::process_gcode_inner(PhysicalPrinter::PhysicalPrinte
         upload_gcode_with_storage_choice(std::move(config), std::move(data));
         return;
     }
-    size_t id = m_print_host_job_manager.emplace_job(std::move(config), std::move(data));
+    m_print_host_job_manager.emplace_job(std::move(config), std::move(data));
 }
 
 void ResultExportInteractor::upload_gcode_with_storage_choice(PhysicalPrinter::PhysicalPrinterConfig config, PrintHost::PrintHostJobData data)

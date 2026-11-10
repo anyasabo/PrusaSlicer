@@ -40,7 +40,6 @@ private:
     using PrintToolRowListViewFactory = Yoga::ViewFactory<
         PrintToolRowItem,
         Biz::PrintToolItem,
-        Biz::PrintToolConfigBoxInteractor&,
         Biz::IConfigBoxSetter&,
         Biz::ProjectInteractor&,
         PrintToolRowItemDisplayOptions>;

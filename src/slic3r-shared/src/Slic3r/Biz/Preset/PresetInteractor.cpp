@@ -179,7 +179,7 @@ PresetInteractor::PresetInteractor(
         *this
     ),
     m_printer_cbi(&scene_interactor, &slicing_interactor, m_printer_cbi_accessor),
-    m_print_tool_cbi(m_workbench, scene_interactor, slicing_interactor, m_print_tool_cbi_accessor)
+    m_print_tool_cbi(scene_interactor, slicing_interactor, m_print_tool_cbi_accessor)
 {
 
     add_listener<IPresetChangedListener>(&m_object_settings_interactor);

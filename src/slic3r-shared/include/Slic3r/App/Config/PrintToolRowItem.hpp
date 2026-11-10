@@ -48,7 +48,6 @@ public:
     PrintToolRowItem(
         size_t index,
         const Biz::PrintToolItem& data,
-        Biz::PrintToolConfigBoxInteractor& cbi,
         Biz::IConfigBoxSetter& cb_setter,
         Biz::ProjectInteractor& project_interactor,
         const PrintToolRowItemDisplayOptions& options = {}

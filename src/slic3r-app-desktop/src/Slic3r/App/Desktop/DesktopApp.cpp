@@ -484,7 +484,7 @@ bool DesktopApp::OnInit()
 
     m_project_saver = std::make_shared<ProjectSaver>(*m_project_interactor, *m_thumbnail_store);
 
-    m_main_frame = new MainFrame(m_workbench, *m_project_interactor, navigator, m_project_saver);
+    m_main_frame = new MainFrame(*m_project_interactor, navigator, m_project_saver);
     platform_services.app_instance_message_handler().init(m_main_frame->GetHandle());
     Platform::WX::WXRenderCanvas& canvas = m_main_frame->get_render_canvas();
     m_gl_context                         = canvas.release_context();
@@ -600,7 +600,6 @@ void DesktopApp::finish_init()
     m_preview_module = std::make_unique<Preview::PreviewRenderModule>(
         m_workbench,
         *m_project_interactor,
-        *m_undo_store,
         m_thumbnail_store,
         m_thumbnail_store_updater,
         m_thumbnail_image_generator,

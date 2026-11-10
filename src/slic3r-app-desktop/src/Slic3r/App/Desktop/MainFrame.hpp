@@ -60,7 +60,6 @@ class MainFrame :
 {
 public:
     MainFrame(
-        Domain::Workbench& workbench,
         Biz::ProjectInteractor& project_interactor,
         Navigator& navigator,
         std::shared_ptr<ProjectSaver> project_saver

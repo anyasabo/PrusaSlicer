@@ -31,7 +31,6 @@ class PrintToolSubcategoryItem :
     using PrintToolRowListViewFactory = Yoga::ViewFactory<
         PrintToolRowItem,
         Biz::PrintToolItem,
-        Biz::PrintToolConfigBoxInteractor&,
         Biz::IConfigBoxSetter&,
         Biz::ProjectInteractor&>;
     using PrintToolRowListView =

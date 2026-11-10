@@ -82,7 +82,6 @@ static wxIcon main_frame_icon()
 #endif // _WIN32
 
 MainFrame::MainFrame(
-    Domain::Workbench& workbench,
     Biz::ProjectInteractor& project_interactor,
     Navigator& navigator,
     std::shared_ptr<ProjectSaver> project_saver

@@ -15,7 +15,6 @@ OverridableConfigRowItem::OverridableConfigRowItem(
     size_t index,
     const Biz::OverrideItem& data,
     Biz::IConfigBoxSetter& cb_setter,
-    Biz::OverridableConfigBoxInteractor& cbi,
     size_t cbi_index
 ) :
     Biz::DataObserver<Biz::OverrideItem>(index, data),

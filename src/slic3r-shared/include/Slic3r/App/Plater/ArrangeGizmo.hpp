@@ -34,9 +34,6 @@ class ArrangeGizmo final :
 public:
     ArrangeGizmo(
         Biz::ArrangeInteractor& arrange_interactor,
-        Render::Device& device,
-        Scene::ISceneProvider& scene_provider,
-        Scene::GeometryDataFactory& data_factory,
         Biz::ProjectInteractor& project_interactor,
         const Domain::Workbench& workbench
     );

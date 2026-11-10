@@ -75,7 +75,6 @@ public:
     PreviewRenderModule(
         const Domain::Workbench& workbench,
         Biz::ProjectInteractor& project_interactor,
-        App::Undo::Store& undo_store,
         std::shared_ptr<ThumbnailStore> thumbnail_store,
         std::shared_ptr<ThumbnailStoreUpdater> thumbnail_store_updater,
         std::shared_ptr<Plater::ThumbnailImageGenerator> thumbnail_image_generator,

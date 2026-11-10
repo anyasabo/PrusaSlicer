@@ -22,7 +22,6 @@ class PrintToolConfigObservableList :
 {
 public:
     explicit PrintToolConfigObservableList(
-        const Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
         Slicing::SlicingInteractor& slicing_interactor
     );

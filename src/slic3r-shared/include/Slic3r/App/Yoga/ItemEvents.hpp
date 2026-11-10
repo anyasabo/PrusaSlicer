@@ -74,8 +74,6 @@ private:
 class LoopEvents
 {
 public:
-    explicit LoopEvents(RootItem& root_item);
-
     void insert_event(EventPtr event);
 
     /**

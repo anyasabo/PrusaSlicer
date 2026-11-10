@@ -77,7 +77,6 @@ public:
     };
 
     explicit PrintToolConfigBoxInteractor(
-        const Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
         Biz::Slicing::SlicingInteractor& slicing_interactor,
         SetAccessor& set_accessor

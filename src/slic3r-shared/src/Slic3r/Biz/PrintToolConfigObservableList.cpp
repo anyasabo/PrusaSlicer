@@ -7,7 +7,6 @@
 namespace Slic3r::Biz {
 
 PrintToolConfigObservableList::PrintToolConfigObservableList(
-    const Domain::Workbench& workbench,
     Scene::SceneInteractor& scene_interactor,
     Slicing::SlicingInteractor& slicing_interactor
 ) :

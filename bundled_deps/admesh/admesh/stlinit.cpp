@@ -84,12 +84,12 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
     	}
     	num_facets = (file_size - HEADER_SIZE) / SIZEOF_STL_FACET;
 
-    	// Read the header.
-    	if (fread(stl->stats.header, LABEL_SIZE, 1, fp) > 79)
-      		stl->stats.header[80] = '\0';
+    	// Read the header. fread returns the number of items (0 or 1), not the number of bytes.
+    	if (fread(stl->stats.header, LABEL_SIZE, 1, fp) == 1)
+      		stl->stats.header[LABEL_SIZE] = '\0';
 
     	// Read the int following the header.  This should contain # of facets.
-	  	uint32_t header_num_facets;
+    	uint32_t header_num_facets;
     	bool header_num_faces_read = fread(&header_num_facets, sizeof(uint32_t), 1, fp) != 0;
 #if BOOST_ENDIAN_BIG_BYTE
     	// Convert from little endian to big endian.

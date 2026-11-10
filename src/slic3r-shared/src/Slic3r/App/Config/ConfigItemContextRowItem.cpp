@@ -18,9 +18,7 @@ ConfigItemContextRowItem::ConfigItemContextRowItem(
     Biz::IConfigBoxSetter& cb_setter,
     size_t cbi_index
 ) :
-    Biz::DataObserver<Biz::ConfigItemContext>(index, data),
-    m_cb_setter(cb_setter),
-    m_cbi_index(cbi_index)
+    Biz::DataObserver<Biz::ConfigItemContext>(index, data)
 {
     set_orientation(Orientation::Horizontal);
     set_gap(5);

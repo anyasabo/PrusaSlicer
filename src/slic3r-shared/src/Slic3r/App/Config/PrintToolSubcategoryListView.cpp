@@ -23,7 +23,6 @@ PrintToolSubcategoryListView::PrintToolSubcategoryListView(
         ScrollArea>(PrintToolSubcategoryListViewFactory{cbi, cbi_setter, project_interactor}),
     Biz::DataObserver<Biz::PrintToolItem>(index, data),
     m_cbi(cbi),
-    m_cbi_setter(cbi_setter),
     m_category_filter(
         std::make_shared<
             Biz::ObservableListSortFilter<Biz::PrintToolItem, Domain::ConfigItemDef::OptionGroup>>()

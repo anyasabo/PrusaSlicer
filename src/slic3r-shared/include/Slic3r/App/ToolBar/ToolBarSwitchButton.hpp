@@ -28,7 +28,6 @@ public:
     float width_with_label() const;
 
 private:
-    SwitchPosition m_switch_position{SwitchPosition::Left};
     std::string m_label;
     float m_width_with_label = 0.f;
 };

@@ -64,7 +64,6 @@ private:
 
     libvgcode::SlaViewer m_viewer;
 
-    float m_legend_height{ 0.0f };
 
     bool m_loading{ false };
 

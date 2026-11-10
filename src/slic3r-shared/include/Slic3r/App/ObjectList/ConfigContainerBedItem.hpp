@@ -109,9 +109,6 @@ public:
         Biz::ProjectInteractor& project_interactor,
         std::function<Biz::Scene::ObjectSelection()> get_selection
     );
-
-private:
-    Yoga::Icon* m_icon{nullptr};
 };
 
 class ConfigContainerBedItem : public Biz::DataObserver<Biz::ObjectList::Bed>, public Yoga::Item

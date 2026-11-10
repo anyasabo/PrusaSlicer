@@ -287,8 +287,7 @@ void VolumeButton::update_drop_line(const Vec2f& pos, const Vec2f& size)
 VolumesItem::VolumesItem(
     Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester
-) :
-    m_project_interactor(project_interactor)
+)
 {
     set_orientation(Orientation::Vertical);
 

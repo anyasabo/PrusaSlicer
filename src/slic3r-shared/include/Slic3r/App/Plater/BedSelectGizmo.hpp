@@ -25,7 +25,6 @@ public:
     Scene::GizmoActivationState on_mouse(Scene::GizmoEventContext& ctx, bool only_active) override;
 
 private:
-    Biz::ProjectInteractor& m_project_interactor;
     Biz::Scene::SceneInteractor& m_scene_interactor;
     Scene::ISceneProvider& m_scene_provider;
     Scene::ClickDetector m_click_detector;

@@ -11,7 +11,6 @@ PrintToolConfigObservableList::PrintToolConfigObservableList(
     Scene::SceneInteractor& scene_interactor,
     Slicing::SlicingInteractor& slicing_interactor
 ) :
-    m_workbench(workbench),
     m_scene_interactor(scene_interactor),
     m_scene_bed_changed_listener_scope(scene_interactor, *this),
     m_selected_bed_changed_listener_scope(scene_interactor, *this),

@@ -52,12 +52,10 @@ protected:
 
 private:
     Biz::PrintToolConfigBoxInteractor& m_cbi;
-    Biz::IConfigBoxSetter& m_cbi_setter;
 
     Biz::UnsharedPointer<
         Biz::ObservableListSortFilter<Biz::PrintToolItem, Domain::ConfigItemDef::OptionGroup>>
         m_category_filter;
-    Yoga::Rectangle* m_background{nullptr};
     Domain::ConfigItemDef::Category m_category{Domain::ConfigItemDef::Category::Unknown};
 };
 

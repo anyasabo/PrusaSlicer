@@ -85,7 +85,6 @@ public:
     ) :
         m_workbench(workbench),
         m_project_interactor(project_interactor),
-        m_undo_store(undo_store),
         m_shared_model_geometry_provider(model_geometry_provider),
         m_thumbnail_store(thumbnail_store),
         m_thumbnail_store_updater(thumbnail_store_updater),
@@ -171,7 +170,6 @@ protected:
 private:
     const Domain::Workbench& m_workbench;
     Biz::ProjectInteractor& m_project_interactor;
-    Undo::Store& m_undo_store;
     std::unique_ptr<PreviewScenePresenter> m_scene_presenter;
     Scene::ISharedModelGeometryProvider* m_shared_model_geometry_provider{ nullptr };
 

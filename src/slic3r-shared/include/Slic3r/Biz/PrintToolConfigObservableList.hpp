@@ -134,7 +134,6 @@ private:
     void update_effective_value_statuses(const Domain::SlicingId slicing_id);
 
 private:
-    const Domain::Workbench& m_workbench;
     Scene::SceneInteractor& m_scene_interactor;
 
     ListenerScope<

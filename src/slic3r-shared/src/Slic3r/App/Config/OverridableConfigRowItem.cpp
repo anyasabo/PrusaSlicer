@@ -20,7 +20,6 @@ OverridableConfigRowItem::OverridableConfigRowItem(
 ) :
     Biz::DataObserver<Biz::OverrideItem>(index, data),
     m_cb_setter(cb_setter),
-    m_cbi(cbi),
     m_cbi_index(cbi_index)
 {
     set_orientation(Orientation::Horizontal);

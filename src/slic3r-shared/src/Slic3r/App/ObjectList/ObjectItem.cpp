@@ -247,8 +247,7 @@ ObjectItem::ObjectItem(
     Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester
 ) :
-    Biz::DataObserver<Biz::ObjectList::Object>(index, state),
-    m_project_interactor(project_interactor)
+    Biz::DataObserver<Biz::ObjectList::Object>(index, state)
 {
     set_orientation(Orientation::Vertical);
     set_flex_shrink(0);

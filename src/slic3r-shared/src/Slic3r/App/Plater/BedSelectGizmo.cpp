@@ -12,7 +12,6 @@ BedSelectGizmo::BedSelectGizmo(
     Biz::ProjectInteractor& project_interactor,
     Scene::ISceneProvider& scene_provider
 ) :
-    m_project_interactor(project_interactor),
     m_scene_interactor(project_interactor.scene_interactor()),
     m_scene_provider(scene_provider)
 { }

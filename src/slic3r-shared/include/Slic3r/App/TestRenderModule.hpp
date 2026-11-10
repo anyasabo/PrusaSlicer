@@ -70,7 +70,6 @@ private:
 
     static constexpr size_t BUF_SIZE = 256;
     char m_text_buffer[BUF_SIZE];
-    bool m_main_window_opened{true};
     float m_geom2_scale{1};
     bool m_render_low{false};
 

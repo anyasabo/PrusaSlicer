@@ -11,7 +11,6 @@ ToolBarSwitchButton::ToolBarSwitchButton(
     const std::string& tooltip
 ) :
     ToolBarButton(icon, tooltip),
-    m_switch_position(switch_position),
     m_label(label)
 {
     set_label(label);

@@ -107,7 +107,6 @@ private:
     SizeInfo m_last_size_info;
 
     // hack
-    bool m_resized = false;
     bool m_opened  = false;
 };
 

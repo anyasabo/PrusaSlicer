@@ -76,9 +76,6 @@ public:
 
 private:
     Biz::ArrangeInteractor& m_arrange_interactor;
-    Render::Device& m_device;
-    Scene::ISceneProvider& m_scene_provider;
-    Scene::GeometryDataFactory& m_data_factory;
     Biz::ProjectInteractor& m_project_interactor;
     const Domain::Workbench& m_workbench;
     Yoga::Passthrough<ArrangeDialog> m_dialog;

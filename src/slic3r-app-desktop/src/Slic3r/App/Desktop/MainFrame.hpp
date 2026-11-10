@@ -134,7 +134,6 @@ private:
 #endif
 
 private:
-    Domain::Workbench& m_workbench;
     Biz::ProjectInteractor& m_project_interactor;
     Biz::Preset::PresetInteractor& m_preset_interactor;
     std::unique_ptr<Platform::WX::WXRenderCanvas> m_canvas;

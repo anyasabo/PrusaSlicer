@@ -78,9 +78,6 @@ ArrangeGizmo::ArrangeGizmo(
     const Domain::Workbench& workbench
 ) :
     m_arrange_interactor{arrange_interactor},
-    m_device{device},
-    m_scene_provider{scene_provider},
-    m_data_factory{data_factory},
     m_project_interactor{project_interactor},
     m_workbench{workbench},
     m_dialog(

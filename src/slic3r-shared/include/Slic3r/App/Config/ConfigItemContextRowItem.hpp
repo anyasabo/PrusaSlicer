@@ -38,11 +38,6 @@ protected:
     void on_data_update() override;
 
 private:
-    Biz::IConfigBoxSetter& m_cb_setter;
-    size_t m_cbi_index{0};
-
-    Domain::ConfigItemDef::GUIType m_last_gui_type{Domain::ConfigItemDef::GUIType::undefined};
-
     ConfigRowItem* m_config_row_item{nullptr};
 };
 

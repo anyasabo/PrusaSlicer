@@ -55,7 +55,6 @@ PrintToolRowItem::PrintToolRowItem(
     const PrintToolRowItemDisplayOptions& options
 ) :
     Biz::DataObserver<Biz::PrintToolItem>(index, data),
-    m_cbi(cbi),
     m_cb_setter(cb_setter),
     m_project_interactor(project_interactor),
     m_options(options),

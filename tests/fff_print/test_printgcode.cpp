@@ -4,6 +4,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/ConfigUtils.hpp"
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
+#include "Slic3r/Version.hpp"
 
 #include "test_data.hpp"
 

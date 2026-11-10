@@ -1,0 +1,5 @@
+#include "Slic3r/Version.hpp"
+
+namespace Slic3r {
+    const char* const BUILD_ID = "@SLIC3R_BUILD_ID@";
+}

@@ -1,13 +1,16 @@
 #pragma once
 
+// The build ID is in BuildId.cpp (made from BuildId.cpp.in), not in this header. Many files include this header, and a
+// build ID that changes on each build (a build number, a commit) then recompiles only one file.
+
 #define SLIC3R_APP_NAME "@SLIC3R_APP_NAME@"
 #define SLIC3R_APP_KEY "@SLIC3R_APP_KEY@"
 #define SLIC3R_VERSION "@SLIC3R_VERSION@"
-#define SLIC3R_BUILD_ID "@SLIC3R_BUILD_ID@"
+#define SLIC3R_BUILD_ID (::Slic3r::BUILD_ID)
 
 namespace Slic3r {
     constexpr const char* APP_NAME = SLIC3R_APP_NAME;
     constexpr const char* APP_KEY = SLIC3R_APP_KEY;
     constexpr const char* VERSION = SLIC3R_VERSION;
-    constexpr const char* BUILD_ID = SLIC3R_BUILD_ID;
+    extern const char* const BUILD_ID;
 }

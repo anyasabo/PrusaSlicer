@@ -1034,30 +1034,6 @@ InvalidatedSteps SLAPrint::apply(
     return model_sync_result.invalidated_steps;
 }
 
-namespace {
-ParserConfig to_config(const Domain::SLA::PrintStatistics& stats)
-{
-    ParserConfig config;
-    const std::string print_time = Slic3r::short_time(Utils::get_time_dhms(float(stats.estimated_print_time)));
-    config.set("print_time", print_time);
-    config.set("objects_used_material", stats.objects_used_material);
-    config.set("support_used_material", stats.support_used_material);
-    config.set("total_cost", stats.total_cost);
-    config.set("total_weight", stats.total_weight);
-    return config;
-}
-
-ParserConfig create_stats_placeholders()
-{
-    ParserConfig config;
-    for (const char* key : {"print_time", "total_cost", "total_weight", 
-        "objects_used_material", "support_used_material"})
-        config.set(key, std::string{"{"} + key + "}");
-    return config;
-}
-
-} // namespace
-
 std::string SLAPrint::validate(std::vector<std::string>*) const
 {
 //    for(SLAPrintObject * po : m_objects) {

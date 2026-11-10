@@ -90,7 +90,6 @@ const Domain::ModelVolume* get_selected_svg_volume(
     const Biz::ProjectInteractor& project_interactor
 );
 Domain::ModelVolume& get_selected_volume(Biz::ProjectInteractor& project_interactor);
-std::string get_filename(const Domain::EmbossShape::SvgFile& svg);
 Domain::Vec2d get_world_size(const ProjectContext& proj_ctx); // current (world) size in mm
 void calc_from_surface(
     ProjectContext& proj_ctx,

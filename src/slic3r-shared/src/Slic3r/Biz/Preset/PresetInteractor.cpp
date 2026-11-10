@@ -39,7 +39,7 @@ using Slic3r::Domain::Vec2ds;
 namespace Slic3r::Biz::Preset {
 namespace {
 
-void dump_ep_info(const Domain::Preset::EvaluatedPrinterPreset& preset)
+[[maybe_unused]] void dump_ep_info(const Domain::Preset::EvaluatedPrinterPreset& preset)
 {
     SPDLOG_INFO("HwConfig: {} ({})", preset.hw_config.name, preset.hw_config.id);
     SPDLOG_INFO("Printer: {} ({})", preset.preset.name, preset.preset.id);
@@ -3363,37 +3363,6 @@ Domain::Preset::PresetParentPaths find_preset_usages(const Domain::Project& proj
 }
 
 
-bool contains_preset_id(const Domain::Preset::SelectedPreset& selected_preset, Domain::Preset::PresetKind kind, const std::string& preset_id)
-{
-    switch (kind) {
-    case Domain::Preset::PresetKind::FdmPrinter:
-    case Domain::Preset::PresetKind::SlaPrinter:
-        return selected_preset.printer.id == preset_id;
-
-    case Domain::Preset::PresetKind::FdmPrint:
-    case Domain::Preset::PresetKind::SlaPrint:
-        return selected_preset.print.id == preset_id;
-
-    case Domain::Preset::PresetKind::FdmToolPrint:
-    case Domain::Preset::PresetKind::SlaToolPrint:
-        return std::ranges::any_of(selected_preset.tools, [&](const auto& p) -> bool { return p.id == preset_id; });
-
-    case Domain::Preset::PresetKind::FdmMaterial:
-    case Domain::Preset::PresetKind::SlaMaterial:
-        return std::ranges::any_of(selected_preset.materials, [&](const auto& p) -> bool { return p.id == preset_id; });
-    }
-    return false;
-}
-
-bool contains_preset_id(const Domain::Project& project, Domain::Preset::PresetKind kind, const std::string& preset_id)
-{
-    return std::ranges::any_of(
-        project.config_containers(),
-        [&](const auto& cc) -> bool
-        { return contains_preset_id(cc.get()->selected_preset(), kind, preset_id); }
-    );
-}
-
 void drop_preset(
     Domain::Preset::EvaluatedPrinterPresets& presets,
     Domain::Preset::PresetKind kind,
@@ -3586,17 +3555,6 @@ PresetInteractorConfigContainerContext& PresetInteractor::get_or_create_config_c
 
 namespace {
 using Domain::Preset::HwPrinterConfig;
-using Domain::Preset::HwPrinterConfigs;
-
-const HwPrinterConfig*
-find_same_config(const HwPrinterConfigs& bundle_configs, const HwPrinterConfig& hw_config)
-{
-    auto it = std::ranges::find_if(
-        bundle_configs,
-        [&hw_config](const HwPrinterConfig& cfg) { return hw_config.has_same_values(cfg); }
-    );
-    return &*it;
-}
 
 template <typename T>
 concept HavingPresetWithId = requires(T a) {

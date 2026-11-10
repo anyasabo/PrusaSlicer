@@ -14,20 +14,6 @@ bool operator==(const BedSegments& a, const BedSegments& b)
     return a.x_count == b.x_count && a.y_count == b.y_count;
 }
 
-static bool check_texture(const std::string& filename)
-{
-    boost::system::error_code ec; // so the exists call does not throw (e.g. after a permission problem)
-    return !filename.empty()
-        && (boost::algorithm::iends_with(filename, ".png") || boost::algorithm::iends_with(filename, ".svg"))
-        && boost::filesystem::exists(filename, ec);
-}
-
-static bool check_model(const std::string& filename)
-{
-    boost::system::error_code ec;
-    return !filename.empty() && boost::algorithm::iends_with(filename, ".stl") && boost::filesystem::exists(filename, ec);
-}
-
 Bed Bed::create(const BedCreationData& data)
 {
     Bed ret;

@@ -65,37 +65,6 @@ std::string get_keyword_from_json(const std::string& body, const std::string& ke
 }
 #endif
 
-// Finds exactly 2 placehodlers %1% and %2% and replaces with v1, v2.
-std::string replace_placeholders(const std::string& text, const std::string& v1, const std::string& v2)
-{
-    constexpr std::string_view p1 = "%1%";
-    constexpr std::string_view p2 = "%2%";
-
-    ASSERT(!text.empty());
-
-    std::string result;
-    result.reserve(text.length());
-
-    size_t current_pos = 0;
-    while (current_pos < text.length()) {
-        size_t p1_pos               = text.find(p1, current_pos);
-        size_t p2_pos               = text.find(p2, current_pos);
-        size_t next_placeholder_pos = std::min(p1_pos, p2_pos);
-        if (next_placeholder_pos == std::string::npos) {
-            result.append(text, current_pos, text.length() - current_pos);
-            break;
-        }
-        result.append(text, current_pos, next_placeholder_pos - current_pos);
-        if (next_placeholder_pos == p1_pos) {
-            result.append(v1);
-            current_pos = next_placeholder_pos + p1.length();
-        } else {
-            result.append(v2);
-            current_pos = next_placeholder_pos + p2.length();
-        }
-    }
-    return result;
-}
 } // namespace
 
 bool PrintHostPrusaConnect::test(std::string& curl_msg, ProgressFn progress_fn, RetryFn retry_fn) const

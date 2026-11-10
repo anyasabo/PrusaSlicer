@@ -56,7 +56,7 @@ struct PrinterData
     std::vector<std::string> filament_type;
 };
 
-PrinterData get_printer_data(const Biz::Preset::PresetInteractor& preset_interactor)
+[[maybe_unused]] PrinterData get_printer_data(const Biz::Preset::PresetInteractor& preset_interactor)
 {
     PrinterData res;
     const auto& hw_config = preset_interactor.current_printer_config();

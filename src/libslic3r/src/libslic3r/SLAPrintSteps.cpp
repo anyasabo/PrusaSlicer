@@ -206,32 +206,6 @@ void prepare_permanent_support_points(
         [](const SupportPoint& p1,const SupportPoint& p2){ return p1.pos.z() < p2.pos.z(); });
 }
 
-using CSGContainer = std::multiset<CSGPartForStep>;
-using CSGRange = Range<CSGContainer::iterator>;
-std::optional<indexed_triangle_set> create_cgal_preview(const CSGContainer& mesh_to_slice){
-    CSGRange r = range(mesh_to_slice);
-    if (is_all_positive(r))
-        return csgmesh_merge_positive_parts(r);
-    
-    if (csg::check_csgmesh_booleans(r) != r.end())
-        return std::nullopt; // bool operation verification fail
-                             // Empty Mesh | Self-Intersection | Volume Bound
-        
-    MeshBoolean::cgal::CGALMeshPtr cgalmeshptr;
-    try {
-        cgalmeshptr = csg::perform_csgmesh_booleans(r);
-    } catch (...) {
-        // leaves cgalmeshptr as nullptr
-        SPDLOG_WARN("CSG mesh is not egligible for proper CGAL booleans!");
-        return std::nullopt;
-    }
-
-    if (!cgalmeshptr)
-        return std::nullopt; // CGAL mesh is not egligible for proper CGAL booleans!
-
-    return MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
-}
-
 void clear_csg(std::multiset<CSGPartForStep>& s, SLAPrintObjectStep step)
 {
     auto r = s.equal_range(step);

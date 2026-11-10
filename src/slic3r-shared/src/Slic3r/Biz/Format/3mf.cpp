@@ -510,7 +510,7 @@ void add_nonprintable_objects(Slic3r::Domain::Model& to, const ObjectMap& object
     }
 }
 
-bool check_pointer(const ModelMap& mm, const Slic3r::Domain::Model& m)
+[[maybe_unused]] bool check_pointer(const ModelMap& mm, const Slic3r::Domain::Model& m)
 {
     Domain::ModelObjectPtrs objects;
     for (const auto& [id, mos] : mm.build)
@@ -612,29 +612,6 @@ ModelMap move_model(/*const*/ LoadedModel& from,
     add_nonprintable_objects(to, object_map);
     assert(check_pointer(model_map, to));
     return model_map;
-}
-
-const CT_Object* get_object(const PathId& path_id, const LoadedModel& loaded_model)
-{
-    const format_3MF::Model* model_3mf_ptr = &(*loaded_model.model);
-    if (!path_id.path.empty()) {
-        auto it_model = loaded_model.sub_models.find(path_id.path);
-        assert(it_model != loaded_model.sub_models.end());
-        if (it_model == loaded_model.sub_models.end())
-            return nullptr;
-        model_3mf_ptr = &it_model->second; // set model to sub model
-    }
-    const CT_Objects& objects_3mf = model_3mf_ptr->resource.objects;
-    auto obj_it                   = std::find_if(
-        objects_3mf.begin(),
-        objects_3mf.end(),
-        [id = path_id.id](const CT_Object& obj) { return obj.id == id; }
-    );
-
-    assert(obj_it != objects_3mf.end());
-    if (obj_it == objects_3mf.end())
-        return nullptr;
-    return &(*obj_it);
 }
 
 } // namespace

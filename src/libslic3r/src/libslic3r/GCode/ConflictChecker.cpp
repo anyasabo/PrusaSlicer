@@ -89,8 +89,6 @@ public:
     }
 
     friend bool operator>(const LinesBucket &left, const LinesBucket &right) { return left._curHeight > right._curHeight; }
-    friend bool operator<(const LinesBucket &left, const LinesBucket &right) { return left._curHeight < right._curHeight; }
-    friend bool operator==(const LinesBucket &left, const LinesBucket &right) { return left._curHeight == right._curHeight; }
 };
 
 struct LinesBucketPtrComp
@@ -148,8 +146,6 @@ inline IndexPair point_map_grid_index(const Point &pt, int64_t xdist, int64_t yd
     auto y = pt.y() / ydist;
     return std::make_pair(x, y);
 }
-
-inline bool nearly_equal(const Point &p1, const Point &p2) { return std::abs(p1.x() - p2.x()) < SCALED_EPSILON && std::abs(p1.y() - p2.y()) < SCALED_EPSILON; }
 
 inline Grids line_rasterization(const Line &line, int64_t xdist = RasteXDistance, int64_t ydist = RasteYDistance)
 {

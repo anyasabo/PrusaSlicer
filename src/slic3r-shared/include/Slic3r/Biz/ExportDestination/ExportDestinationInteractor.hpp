@@ -71,6 +71,13 @@ public:
     void on_user_account_logged_out() override;
 
 private:
+    /// The destination that the selected physical printer gives: its own upload (PrintHost), or Connect for a
+    /// Connect printer. std::nullopt if the printer gives none, or if that destination cannot be selected.
+    std::optional<ExportDestination> printer_destination() const;
+    /// If the user did not select a destination, use the destination of the selected physical printer.
+    /// Returns true if it applied one.
+    bool follow_printer();
+
     void restore_last_used_selection();
     void apply(ExportDestination destination);
     void select_default();

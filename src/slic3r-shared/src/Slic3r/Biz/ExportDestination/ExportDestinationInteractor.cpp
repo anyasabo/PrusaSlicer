@@ -45,6 +45,32 @@ bool ExportDestinationInteractor::can_select(ExportDestination destination) cons
     return false;
 }
 
+std::optional<ExportDestination> ExportDestinationInteractor::printer_destination() const
+{
+    if (m_physical_printer_interactor.is_printer_upload_selected()) {
+        return ExportDestination::PrintHost;
+    }
+    if (m_physical_printer_interactor.is_connect_printer_selected() && can_select(ExportDestination::Connect)) {
+        return ExportDestination::Connect;
+    }
+    return std::nullopt;
+}
+
+bool ExportDestinationInteractor::follow_printer()
+{
+    if (m_explicit_selection) {
+        return false;
+    }
+    const std::optional<ExportDestination> destination = printer_destination();
+    if (!destination) {
+        return false;
+    }
+    if (*destination != m_selected) {
+        apply(*destination);
+    }
+    return true;
+}
+
 void ExportDestinationInteractor::apply(ExportDestination destination)
 {
     m_selected = destination;
@@ -96,6 +122,12 @@ void ExportDestinationInteractor::on_selected_config_container_changed(
 {
     m_current_container = ContainerKey{project_id, container_id};
 
+    // The physical printer interactor can select the printer of the new container before or after this call.
+    // on_selected_physical_printer_changed() does the same, so the result does not depend on the order.
+    if (follow_printer()) {
+        return;
+    }
+
     if (auto it = m_container_to_destination_map.find(m_current_container); it != m_container_to_destination_map.end()) {
         if (can_select(it->second)) {
             apply(it->second);
@@ -127,21 +159,28 @@ void ExportDestinationInteractor::on_removable_drive_status_changed(
 
 void ExportDestinationInteractor::on_selected_physical_printer_changed()
 {
+    // The app also selects a printer without a user pick: the last used printer at the start, the printer of a
+    // project or a bed. The destination follows it, unless the user selected a destination.
+    if (follow_printer()) {
+        return;
+    }
     ensure_valid();
 }
 
 void ExportDestinationInteractor::on_physical_printer_picked()
 {
-    if (m_physical_printer_interactor.is_printer_upload_selected()) {
-        select(ExportDestination::PrintHost);
-    } else if (m_physical_printer_interactor.is_connect_printer_selected() && can_select(ExportDestination::Connect)) {
-        select(ExportDestination::Connect);
+    if (const std::optional<ExportDestination> destination = printer_destination()) {
+        select(*destination);
     }
 }
 
 void ExportDestinationInteractor::on_user_account_id_success(bool is_refresh, const std::string& /* username */)
 {
     if (is_refresh || m_explicit_selection || m_selected != ExportDestination::LocalDrive) {
+        return;
+    }
+    // The login makes Connect available, often after the printer was selected. The printer has priority.
+    if (follow_printer()) {
         return;
     }
     apply(ExportDestination::Connect);

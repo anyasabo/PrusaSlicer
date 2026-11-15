@@ -6,7 +6,10 @@
 """Makes seqarrange_bench corpus cases from the plates of a 3MF project.
 
 Usage: uv run from_3mf.py PROJECT.3mf [...] [--out DIR] [--printers MK4S,COREONE,...] [--name NAME]
-                                       [--geometries geometries.json]
+                                       [--geometries geometries.json] [--all]
+
+--all puts all printable instances into one case, also the instances outside the beds. The GUI arrange of all beds
+does the same.
 
 The script reads the projects of PrusaSlicer 2.x and 3.x, and plain 3MF files of other programs. For each
 plate (bed) with two or more printable instances, it writes one case file for each printer:
@@ -332,6 +335,9 @@ def main():
     out_dir = Path(opt("--out", "."))
     printers_arg = opt("--printers")
     name_arg = opt("--name")
+    all_instances = "--all" in args
+    if all_instances:
+        args.remove("--all")
     geometries = json.loads(Path(opt("--geometries", str(GEOMETRIES))).read_text())
     if not args:
         print(__doc__)
@@ -371,6 +377,9 @@ def main():
         for oi, obj in enumerate(objects):
             for ii, inst in enumerate(obj["instances"]):
                 if not inst[1]:
+                    continue
+                if all_instances:
+                    plates.setdefault(0, []).append((oi, ii, 0))
                     continue
                 x, y = inst[0][0, 3] - origin[0], inst[0][1, 3] - origin[1]
                 for b, (bx, by) in enumerate(beds):

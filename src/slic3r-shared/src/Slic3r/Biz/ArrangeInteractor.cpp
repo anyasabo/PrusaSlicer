@@ -862,10 +862,11 @@ std::optional<SeqPlates> arrange_sequential_job(StopToken stop_token, ProgressTr
             if (stop_token.stop_requested()) {
                 throw CanceledException{};
             }
-            // ProgressTracker::set() must not go back, and each call goes to the main thread.
+            // ProgressTracker::set() must not go back, and each call goes to the main thread. The job
+            // notification shows the value as a fraction (0 to 1), as MeshRepairJob gives it. The arrange gives 0 to 100.
             if (progress > last_progress) {
                 last_progress = progress;
-                progress_tracker.set(Domain::Percentage{double(progress)});
+                progress_tracker.set(Domain::Percentage{double(progress) / 100.});
             }
         });
     } catch (const CanceledException&) {

@@ -23,6 +23,7 @@
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "Slic3r/Biz/Algorithms/SVG.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 
 #include <z3++.h>
 
@@ -1253,6 +1254,42 @@ void preprocessing_test_6(void)
     #endif
     INFO("Testing preprocess 6 ... finished");    
 }    
+
+
+/*----------------------------------------------------------------*/
+
+TEST_CASE("Decimation of a right triangle stops", "[Sequential Arrangement Preprocessing]")
+{
+    // The footprint of a real object (a fin). The center of its bounding box is on the hypotenuse. The decimation
+    // grew the polygon about that point, so the hypotenuse did not move, and the loop did not stop.
+    const Polygon polygon({ { -33987000, -19265700 },
+			    { -33910900, -19341900 },
+			    { -33818500, -19434300 },
+			    { -22030100, -31222700 },
+			    { -21987000, -31265700 },
+			    {  33987000, -31265700 },
+			    {  30479200, -28038700 },
+			    { -30967800,  28488300 },
+			    { -33987000,  31265700 } });
+
+    SolverConfiguration solver_configuration;
+
+    for (bool extra_safety : { false, true })
+    {
+	Polygon decimated_polygon;
+	decimate_PolygonForSequentialSolver(solver_configuration, polygon, decimated_polygon, extra_safety);
+
+	REQUIRE(decimated_polygon.points.size() >= 3);
+	for (const Point &point : polygon.points)
+	{
+	    REQUIRE(Slic3r::Biz::Algorithms::Polygon::contains(decimated_polygon, point));
+	}
+	// The polygon must not grow much: the bounding box of the original is a limit.
+	const BoundingBox box = get_extents(decimated_polygon);
+	const BoundingBox original_box = get_extents(polygon);
+	REQUIRE(box.max.x() - box.min.x() <= 2 * (original_box.max.x() - original_box.min.x()));
+    }
+}
 
 
 /*----------------------------------------------------------------*/

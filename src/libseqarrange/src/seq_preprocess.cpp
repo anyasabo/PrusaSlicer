@@ -562,21 +562,51 @@ void transform_UpsideDown(const SolverConfiguration &solver_configuration, coord
 
 void grow_PolygonForContainedness(coord_t center_x, coord_t center_y, Slic3r::Polygon &polygon)
 {
+    // Scale the polygon about the center. The center must be inside the polygon. If the center is on the line of
+    // an edge, the scale does not move that edge, and a point outside the edge never comes inside.
     for (unsigned int i = 0; i < polygon.points.size(); ++i)
     {
-	polygon.points[i] *= SEQ_POLYGON_DECIMATION_GROW_FACTOR;
+	const double dx = double(polygon.points[i].x()) - center_x;
+	const double dy = double(polygon.points[i].y()) - center_y;
+
+	polygon.points[i] = Point(center_x + coord_t(std::llround(dx * SEQ_POLYGON_DECIMATION_GROW_FACTOR)),
+				  center_y + coord_t(std::llround(dy * SEQ_POLYGON_DECIMATION_GROW_FACTOR)));
     }
-    
-    BoundingBox polygon_box = get_extents(polygon);
-    
-    coord_t shift_x = ((polygon_box.min.x() + polygon_box.max.x()) / 2) - center_x;
-    coord_t shift_y = ((polygon_box.min.y() + polygon_box.max.y()) / 2) - center_y;
-    
-    for (unsigned int i = 0; i < polygon.points.size(); ++i)
-    {
-	polygon.points[i] -= Point(shift_x, shift_y);
-    }    
 }
+
+
+namespace {
+
+// The polygon grows to this size at most (1.005^280 is about 4). If it does not contain the original polygon then,
+// the bounding box replaces it. Without a limit, the coordinates overflow and the loop does not stop.
+const int SEQ_POLYGON_DECIMATION_MAX_GROW_STEPS = 280;
+
+// A point inside the polygon: the centroid of its area. The center of the bounding box can be on an edge, for
+// example on the hypotenuse of a right triangle.
+Point interior_PointForGrowing(const Slic3r::Polygon &polygon, const Point &fallback)
+{
+    double area = 0, cx = 0, cy = 0;
+    for (size_t i = 0; i < polygon.points.size(); ++i)
+    {
+	const Point &a = polygon.points[i];
+	const Point &b = polygon.points[(i + 1) % polygon.points.size()];
+	const double cross = double(a.x()) * double(b.y()) - double(b.x()) * double(a.y());
+	area += cross;
+	cx += (double(a.x()) + double(b.x())) * cross;
+	cy += (double(a.y()) + double(b.y())) * cross;
+    }
+    if (area != 0)
+    {
+	const Point centroid(coord_t(std::llround(cx / (3 * area))), coord_t(std::llround(cy / (3 * area))));
+	if (Algorithms::Polygon::contains(polygon, centroid, false))
+	{
+	    return centroid;
+	}
+    }
+    return fallback;
+}
+
+} // namespace
 
 
 void decimate_PolygonForSequentialSolver(const SolverConfiguration &solver_configuration,
@@ -607,7 +637,11 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
     
     if (decimated_polygon.points.size() >= 4)
     {
-	while (true)
+	const Point center = interior_PointForGrowing(decimated_polygon, Point(center_x, center_y));
+	center_x = center.x();
+	center_y = center.y();
+
+	for (int step = 0; step < SEQ_POLYGON_DECIMATION_MAX_GROW_STEPS; ++step)
 	{
 	    grow_PolygonForContainedness(center_x, center_y, decimated_polygon);
 	    	    
@@ -627,7 +661,7 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 		{
 		    Slic3r::Polygon prefinal_polygon = decimated_polygon;
 
-		    while (true)
+		    for (int safety_step = 0; safety_step < SEQ_POLYGON_DECIMATION_MAX_GROW_STEPS; ++safety_step)
 		    {
 			grow_PolygonForContainedness(center_x, center_y, decimated_polygon);
 			Slic3r::Polygon truncated_polygon = truncate_PolygonAsSeenBySequentialSolver(SEQ_SLICER_SCALE_FACTOR, decimated_polygon);
@@ -647,20 +681,18 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 			    return;
 			}
 		    }
+		    // The limit of the steps: use the bounding box below.
+		    break;
 		}
 		return;
 	    }
 	}
     }
-    else
-    {
-	BoundingBox polygon_box = get_extents(polygon);
-	
-	decimated_polygon = { { polygon_box.min.x(), polygon_box.min.y() },
-			      { polygon_box.max.x(), polygon_box.min.y() },
-			      { polygon_box.max.x(), polygon_box.max.y() },
-			      { polygon_box.min.x(), polygon_box.max.y() } };
-    }
+    // Too few points, or the limit of the steps: the bounding box contains the polygon.
+    decimated_polygon = { { polygon_box.min.x(), polygon_box.min.y() },
+			  { polygon_box.max.x(), polygon_box.min.y() },
+			  { polygon_box.max.x(), polygon_box.max.y() },
+			  { polygon_box.min.x(), polygon_box.max.y() } };
     
     #ifdef DEBUG
     {

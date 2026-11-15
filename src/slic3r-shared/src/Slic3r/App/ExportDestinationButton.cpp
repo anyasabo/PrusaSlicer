@@ -1,8 +1,11 @@
 #include "Slic3r/App/ExportDestinationButton.hpp"
 
+#include "Slic3r/App/Yoga/ImGuiUtils.hpp"
 #include "Slic3r/App/Yoga/Menu.hpp"
 #include "Slic3r/App/Yoga/MenuItem.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+
+#include <imgui_internal.h>
 
 namespace Slic3r::App {
 
@@ -62,6 +65,33 @@ void ExportDestinationButton::refresh()
 {
     set_label(destination_label(m_interactor.selected()));
     set_icon(destination_icon(m_interactor.selected()));
+}
+
+void ExportDestinationButton::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
+{
+    Yoga::LayoutButton::render(pos, size);
+
+    ImDrawList* draw_list{ImGui::GetWindowDrawList()};
+    if (draw_list == nullptr) {
+        return;
+    }
+    // The same arrow as on a combo box (ImGui::BeginCombo) and on ColorDropdown.
+    const ImGuiStyle& style{GImGui->Style};
+    const float arrow_size{ImGui::GetFrameHeight()};
+    const ImRect bb{to_im(pos), to_im(pos + size)};
+    const float arrow_left{bb.Max.x - arrow_size};
+    if (arrow_left <= bb.Min.x) {
+        return;
+    }
+    const float height{GImGui->FontSize};
+    Yoga::YGRenderArrow(
+        draw_list,
+        ImVec2(arrow_left + style.FramePadding.x, bb.Min.y + (bb.GetHeight() - height) / 2.f),
+        ImVec2(arrow_size - 2.f * style.FramePadding.x, height),
+        ImGui::GetColorU32(hovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+        ImGuiDir_Down,
+        1.0f
+    );
 }
 
 void ExportDestinationButton::open_menu()

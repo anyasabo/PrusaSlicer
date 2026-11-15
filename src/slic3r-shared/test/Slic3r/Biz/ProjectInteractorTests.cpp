@@ -312,6 +312,7 @@ TEST_CASE_METHOD(
 namespace {
 
 using Slic3r::Biz::PhysicalPrinter::FileSystemExport;
+using Slic3r::Biz::PhysicalPrinter::PrinterUpload;
 using Slic3r::Biz::PhysicalPrinter::PhysicalPrinterConfig;
 using Slic3r::Biz::PhysicalPrinter::PhysicalPrinterInteractor;
 
@@ -843,3 +844,69 @@ TEST_CASE_METHOD(
     CHECK(selected_filament_type(0) == filament_type);
 }
 
+
+namespace {
+
+// A stored printer with a PrusaLink connection. It is saved, but not picked: a pick also selects the destination.
+std::string save_prusalink_printer(PhysicalPrinterFromProjectFixture& fixture, const std::string& name)
+{
+    PhysicalPrinterConfig printer;
+    printer.payload   = PrinterUpload{Slic3r::Domain::PrintHostType::PrusaLink, "key"};
+    printer.name      = name;
+    printer.hw_config = fixture.current_hw_config();
+    fixture.stored_uuids.push_back(fixture.physical_printers().save_physical_printer(printer));
+    return fixture.stored_uuids.back();
+}
+
+} // namespace
+
+TEST_CASE_METHOD(
+    PhysicalPrinterFromProjectFixture,
+    "Export destination follows a printer that the app selects",
+    "[ProjectInteractor][PhysicalPrinter][ExportDestination]"
+)
+{
+    using Slic3r::Biz::ExportDestination::ExportDestination;
+    const std::string uuid = save_prusalink_printer(*this, "Link printer");
+    selected_config_container().physical_printer_selection() = {uuid, "Link printer"};
+    const fs::path path = store_selected_project();
+    REQUIRE(project_interactor->export_destination_interactor().selected() != ExportDestination::PrintHost);
+
+    // The load selects the printer of the project. The user does not pick it.
+    load(path);
+
+    REQUIRE(physical_printers().selected_uuid() == uuid);
+    CHECK(project_interactor->export_destination_interactor().selected() == ExportDestination::PrintHost);
+}
+
+TEST_CASE_METHOD(
+    PhysicalPrinterFromProjectFixture,
+    "Export destination selected by the user stays when the app selects a printer",
+    "[ProjectInteractor][PhysicalPrinter][ExportDestination]"
+)
+{
+    using Slic3r::Biz::ExportDestination::ExportDestination;
+    const std::string uuid = save_prusalink_printer(*this, "Link printer");
+    selected_config_container().physical_printer_selection() = {uuid, "Link printer"};
+    const fs::path path = store_selected_project();
+    project_interactor->export_destination_interactor().select(ExportDestination::LocalDrive);
+
+    load(path);
+
+    REQUIRE(physical_printers().selected_uuid() == uuid);
+    CHECK(project_interactor->export_destination_interactor().selected() == ExportDestination::LocalDrive);
+}
+
+TEST_CASE_METHOD(
+    PhysicalPrinterFromProjectFixture,
+    "Export destination follows a picked printer",
+    "[ProjectInteractor][PhysicalPrinter][ExportDestination]"
+)
+{
+    using Slic3r::Biz::ExportDestination::ExportDestination;
+    const std::string uuid = save_prusalink_printer(*this, "Link printer");
+
+    physical_printers().select_uuid(uuid);
+
+    CHECK(project_interactor->export_destination_interactor().selected() == ExportDestination::PrintHost);
+}

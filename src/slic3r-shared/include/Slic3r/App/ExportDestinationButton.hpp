@@ -25,6 +25,9 @@ public:
 
     void on_export_destination_changed() override;
 
+    /// Draws a down arrow at the right edge, as on a combo box: the button opens a menu of destinations.
+    void render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size) override;
+
 private:
     void refresh();
     void open_menu();

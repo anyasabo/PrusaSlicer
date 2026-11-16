@@ -177,6 +177,10 @@ private:
 		// Good primes for addressing a cca. 30 bit space.
 		// https://planetmath.org/goodhashtableprimes
 		static std::vector<uint32_t> primes{ 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741 };
+		// The repair can remove all faces. Without this check, 0 * 3 * 2 - 1 wraps around and
+		// selects the largest table.
+		if (nr_faces == 0)
+			return primes.front();
 		// Find a prime number for 50% filling of the shared triangle edges in the mesh.
 		auto it = std::upper_bound(primes.begin(), primes.end(), nr_faces * 3 * 2 - 1);
 		return (it == primes.end()) ? primes.back() : *it;

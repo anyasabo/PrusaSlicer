@@ -73,3 +73,36 @@ TEST_CASE("STL with coordinates out of the range of the repair grid loads", "[st
 
     CHECK((loaded.has_value() || !loaded.error().empty()));
 }
+
+TEST_CASE("STL with only degenerate triangles is reported as empty", "[stl]")
+{
+    // The repair removes all degenerate triangles. The size of the edge hash table was then
+    // calculated from 0 * 6 - 1, which wraps around, and the table had 1.6 billion entries
+    // (12.9 GB). Run with ASAN_OPTIONS=max_allocation_size_mb=4096 to make that allocation fail.
+    const ::Tests::TestTempDir temp_dir;
+    const boost::filesystem::path file_path = temp_dir.path() / "degenerate_triangles.stl";
+    {
+        boost::nowide::ofstream file(file_path.string());
+        file << "solid a\n"
+                "  facet normal 0 0 1\n"
+                "    outer loop\n"
+                "      vertex 0 0 0\n"
+                "      vertex 0 0 0\n"
+                "      vertex 0 10 0\n"
+                "    endloop\n"
+                "  endfacet\n"
+                "  facet normal 0 0 1\n"
+                "    outer loop\n"
+                "      vertex 5 5 5\n"
+                "      vertex 5 6 5\n"
+                "      vertex 5 6 5\n"
+                "    endloop\n"
+                "  endfacet\n"
+                "endsolid a\n";
+    }
+
+    const auto loaded = Biz::load_stl(file_path.string());
+
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK_THAT(loaded.error(), Catch::Matchers::ContainsSubstring("empty"));
+}

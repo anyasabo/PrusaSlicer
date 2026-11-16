@@ -74,9 +74,12 @@ static void append_realationship(const pugi::xml_node &node, std::optional<RootR
         else
             collected_issues.add_issue(Read3mfIssue(Read3mfIssueType::relation_project_without_target));
     } else {
-        SPDLOG_INFO("Not known realtions (Type={}, Target={}, Id={})", r.type, r.target, r.id);
-        collected_issues.add_issue(Read3mfIssue(Read3mfIssueType::relation_unexpected_type, 
-            std::nullopt, std::string(r.type) + " " + std::string(r.target) + " " + std::string(r.id)));
+        // Target and Id may be missing (nullptr).
+        const std::string target = r.target != nullptr ? r.target : "";
+        const std::string id     = r.id != nullptr ? r.id : "";
+        SPDLOG_INFO("Not known realtions (Type={}, Target={}, Id={})", r.type, target, id);
+        collected_issues.add_issue(Read3mfIssue(Read3mfIssueType::relation_unexpected_type,
+            std::nullopt, std::string(r.type) + " " + target + " " + id));
     }
 }
 

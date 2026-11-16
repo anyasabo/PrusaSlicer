@@ -912,3 +912,17 @@ TEST_CASE("3MF legacy config with support_material_auto but no support_material 
 
     CHECK(model.objects.size() == 1);
 }
+
+TEST_CASE("3MF relationship of an unknown type without Target and Id is reported", "[3mf]")
+{
+    // The issue text was built from std::string(nullptr).
+    const TempProjectFile file({
+        {"_rels/.rels", relationships_xml("<Relationship Type=\"urn:example:unknown-relationship\"/>\n")},
+        {"3D/3dmodel.model", cube_model(APPLICATION_CURRENT)},
+    });
+
+    std::optional<Loaded3MF> loaded;
+    REQUIRE_NOTHROW(loaded.emplace(load_3mf(file.path().string())));
+    CHECK(loaded->model.objects.size() == 1);
+    CHECK(loaded->issues_map.has_issue(Read3mfIssueType::relation_unexpected_type));
+}

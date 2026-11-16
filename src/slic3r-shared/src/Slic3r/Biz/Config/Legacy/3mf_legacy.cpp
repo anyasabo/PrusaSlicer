@@ -60,6 +60,7 @@ namespace pt = boost::property_tree;
 #include "Slic3r/Biz/Config/Legacy/LegacyCustomGCodesList.hpp"
 #include "Slic3r/Biz/Format/VirtualExtruder.hpp"
 #include "Slic3r/Biz/Format/3mf/LegacyPaintingCompat.hpp"
+#include "Slic3r/Biz/Format/3mf/PaintingValidation.hpp"
 
 using Slic3r::Domain::TriangleMesh;
 using Slic3r::Domain::Index3;
@@ -3038,17 +3039,30 @@ namespace Slic3rLegacy {
             volume->seam_facets.reserve(triangles_count);
             volume->mm_segmentation_facets.reserve(triangles_count);
             volume->fuzzy_skin_facets.reserve(triangles_count);
+            // Paint data comes from the file: drop malformed per-triangle strings (treat the
+            // triangle as unpainted) instead of handing them to the decoder.
+            size_t invalid_paint_strings = 0;
+            const auto set_triangle = [&invalid_paint_strings](Slic3r::Domain::FacetsAnnotation& facets, int triangle_id, const std::string& str) {
+                if (Slic3r::format_3MF::is_valid_triangle_paint_string(str)) {
+                    facets.set_triangle_from_string(triangle_id, str);
+                } else {
+                    ++invalid_paint_strings;
+                    facets.set_triangle_from_string(triangle_id, std::string());
+                }
+            };
             for (size_t i=0; i<triangles_count; ++i) {
                 size_t index = volume_data.first_triangle_id + i;
                 assert(index < geometry.custom_supports.size());
                 assert(index < geometry.custom_seam.size());
                 assert(index < geometry.mm_segmentation.size());
 
-                volume->supported_facets.set_triangle_from_string(i, geometry.custom_supports[index]);
-                volume->seam_facets.set_triangle_from_string(i, geometry.custom_seam[index]);
-                volume->mm_segmentation_facets.set_triangle_from_string(i, geometry.mm_segmentation[index]);
-                volume->fuzzy_skin_facets.set_triangle_from_string(i, geometry.fuzzy_skin[index]);
+                set_triangle(volume->supported_facets, i, geometry.custom_supports[index]);
+                set_triangle(volume->seam_facets, i, geometry.custom_seam[index]);
+                set_triangle(volume->mm_segmentation_facets, i, geometry.mm_segmentation[index]);
+                set_triangle(volume->fuzzy_skin_facets, i, geometry.fuzzy_skin[index]);
             }
+            if (invalid_paint_strings > 0)
+                SPDLOG_WARN("3MF: ignored {} malformed paint-on data strings", invalid_paint_strings);
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mm_segmentation_facets.shrink_to_fit();

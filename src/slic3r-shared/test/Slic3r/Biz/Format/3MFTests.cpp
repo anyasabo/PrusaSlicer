@@ -3,7 +3,10 @@
 #include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/FileLoadingLogic.hpp"
 #include "Slic3r/Biz/Format/3mf.hpp"
+#include "Slic3r/Biz/Format/3mf/PaintingValidation.hpp"
 #include "Slic3r/Biz/Slicing/TestUtils.hpp"
+#include "Slic3r/Log.hpp"
+#include "Slic3r/TestUtils/TestTempDir.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Project.hpp"
 #include "Slic3r/Biz/Config/3mf_legacy.hpp"
@@ -11,10 +14,17 @@
 
 #include <boost/filesystem.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <iterator>
+#include <memory>
 #include <optional>
+#include <random>
 #include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace Slic3r;
 using namespace Slic3r::Biz;
@@ -574,4 +584,317 @@ TEST_CASE("3MF failing in the legacy loader reports the reason", "[3mf]")
 
     REQUIRE_FALSE(imported.has_value());
     CHECK_THAT(imported.error(), Catch::Matchers::ContainsSubstring("at line 4"));
+}
+
+// Malformed files. 3MF files come from the internet (the Printables "Load" button), so the
+// loaders must reject malformed data instead of crashing, or handing it to code that trusts it.
+
+namespace {
+
+const std::string CONTENT_TYPES_XML =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n"
+    "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n"
+    "<Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n"
+    "</Types>\n";
+
+const std::string ROOT_MODEL_RELATIONSHIP =
+    "<Relationship Target=\"/3D/3dmodel.model\" Id=\"rel-1\" "
+    "Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\"/>\n";
+
+std::string relationships_xml(const std::string& extra_relationships = {})
+{
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+           "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
+        ROOT_MODEL_RELATIONSHIP + extra_relationships + "</Relationships>\n";
+}
+
+// The "Application" metadata selects the loader: PrusaSlicer 2.x files go to the legacy one.
+const std::string APPLICATION_LEGACY  = "PrusaSlicer-2.9.6";
+const std::string APPLICATION_CURRENT = "PrusaSlicer-3.0.0";
+
+// The root model of a 10 mm cube (12 triangles). `first_triangle_attributes` is added to the
+// first <triangle>: the legacy loader reads the paint-on data from there.
+std::string cube_model(const std::string& application, const std::string& first_triangle_attributes = {})
+{
+    std::ostringstream out;
+    out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+           "<model unit=\"millimeter\" xml:lang=\"en-US\" "
+           "xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" "
+           "xmlns:slic3rpe=\"http://schemas.slic3r.org/3mf/2017/06\">\n"
+           "<metadata name=\"slic3rpe:Version3mf\">1</metadata>\n"
+           "<metadata name=\"Application\">" << application << "</metadata>\n"
+           "<resources>\n<object id=\"1\" type=\"model\">\n<mesh>\n<vertices>\n";
+    const int vertices[8][3] = {{0, 0, 0},   {10, 0, 0},   {10, 10, 0},  {0, 10, 0},
+                                {0, 0, 10},  {10, 0, 10},  {10, 10, 10}, {0, 10, 10}};
+    for (const auto& v : vertices)
+        out << "<vertex x=\"" << v[0] << "\" y=\"" << v[1] << "\" z=\"" << v[2] << "\"/>\n";
+    out << "</vertices>\n<triangles>\n";
+    const int triangles[12][3] = {{0, 2, 1}, {0, 3, 2}, {4, 5, 6}, {4, 6, 7}, {0, 1, 5}, {0, 5, 4},
+                                  {1, 2, 6}, {1, 6, 5}, {2, 3, 7}, {2, 7, 6}, {3, 0, 4}, {3, 4, 7}};
+    for (size_t i = 0; i < std::size(triangles); ++i) {
+        out << "<triangle v1=\"" << triangles[i][0] << "\" v2=\"" << triangles[i][1] << "\" v3=\""
+            << triangles[i][2] << "\"" << (i == 0 ? " " + first_triangle_attributes : "") << "/>\n";
+    }
+    out << "</triangles>\n</mesh>\n</object>\n</resources>\n"
+           "<build>\n<item objectid=\"1\"/>\n</build>\n</model>\n";
+    return out.str();
+}
+
+// A 3mf in a new temporary directory. The destructor removes the directory.
+class TempProjectFile
+{
+public:
+    // `entries` are the archive entries other than [Content_Types].xml, as (name, content).
+    explicit TempProjectFile(const std::vector<std::pair<std::string, std::string>>& entries)
+        : m_path(m_dir.path() / "malformed.3mf")
+    {
+        Algorithms::ZipArchive archive = Algorithms::ZipArchive::open(m_path.string(), Algorithms::ZipArchive::Mode::Write);
+        REQUIRE(archive.is_open());
+        REQUIRE(archive.add_entry("[Content_Types].xml", CONTENT_TYPES_XML.data(), CONTENT_TYPES_XML.size()));
+        for (const auto& [name, content] : entries)
+            REQUIRE(archive.add_entry(name, content.data(), content.size()));
+        REQUIRE(archive.close());
+    }
+    TempProjectFile(const TempProjectFile&)            = delete;
+    TempProjectFile& operator=(const TempProjectFile&) = delete;
+
+    const fs::path& path() const { return m_path; }
+
+private:
+    ::Tests::TestTempDir m_dir;
+    fs::path m_path;
+};
+
+// A current-format cube 3mf with `facets_json` as Metadata/Slic3r_facets_annotation.json.
+TempProjectFile cube_with_facets_annotation(const std::string& facets_json)
+{
+    return TempProjectFile({
+        {"_rels/.rels", relationships_xml()},
+        {"3D/3dmodel.model", cube_model(APPLICATION_CURRENT)},
+        {"Metadata/Slic3r_facets_annotation.json", facets_json},
+    });
+}
+
+// A legacy (2.x) cube 3mf with `first_triangle_attributes` on its first triangle and with
+// `config` as Metadata/Slic3r_PE.config (no config if empty).
+TempProjectFile legacy_cube(const std::string& first_triangle_attributes, const std::string& config = {})
+{
+    std::vector<std::pair<std::string, std::string>> entries{
+        {"_rels/.rels", relationships_xml()},
+        {"3D/3dmodel.model", cube_model(APPLICATION_LEGACY, first_triangle_attributes)},
+    };
+    if (!config.empty())
+        entries.emplace_back("Metadata/Slic3r_PE.config", config);
+    return TempProjectFile(entries);
+}
+
+// Decodes the paint data as the paint tools and the slicer do. Malformed data reads or writes
+// out of bounds here (visible with ASan or with _GLIBCXX_ASSERTIONS).
+void decode_paint(const ModelVolume& volume, const FacetsAnnotation& facets)
+{
+    Algorithms::TriangleSelector selector{volume.mesh()};
+    selector.deserialize(facets.get_data());
+}
+
+} // namespace
+
+TEST_CASE("3MF paint-on data validation accepts well-formed and rejects malformed strings", "[3mf]")
+{
+    using format_3MF::is_valid_triangle_paint_string;
+
+    // The decoder reads the hex digits from the end of the string. A digit is a leaf (state << 2,
+    // or 0xC and an extended state) or a split (number of split sides | special side << 2), which
+    // is followed by its children.
+    CHECK(is_valid_triangle_paint_string(""));      // Not painted.
+    CHECK(is_valid_triangle_paint_string("4"));     // State 1.
+    CHECK(is_valid_triangle_paint_string("8"));     // State 2.
+    CHECK(is_valid_triangle_paint_string("0C"));    // State 3.
+    CHECK(is_valid_triangle_paint_string("DC"));    // State 16.
+    CHECK(is_valid_triangle_paint_string("00EC"));  // State 17.
+    CHECK(is_valid_triangle_paint_string("EEEC"));  // State 255.
+    CHECK(is_valid_triangle_paint_string("481"));   // One split side, two children.
+    CHECK(is_valid_triangle_paint_string("48483")); // Three split sides, four children.
+    CHECK(is_valid_triangle_paint_string("48411")); // A split child.
+
+    CHECK_FALSE(is_valid_triangle_paint_string("1"));    // A split without its children.
+    CHECK_FALSE(is_valid_triangle_paint_string("41"));   // A split with one of its two children.
+    CHECK_FALSE(is_valid_triangle_paint_string("C"));    // An extended state without its digit.
+    CHECK_FALSE(is_valid_triangle_paint_string("0EC"));  // An 8-bit state with one of its two digits.
+    CHECK_FALSE(is_valid_triangle_paint_string("FFEC")); // State 272.
+    CHECK_FALSE(is_valid_triangle_paint_string("44D"));  // Special side 3, a triangle has sides 0-2.
+    CHECK_FALSE(is_valid_triangle_paint_string("4848B")); // Three split sides with special side 2.
+    CHECK_FALSE(is_valid_triangle_paint_string("04"));   // Data after the end of the tree.
+    CHECK_FALSE(is_valid_triangle_paint_string("c"));    // Lower case.
+    CHECK_FALSE(is_valid_triangle_paint_string("4G"));   // Not hex.
+}
+
+TEST_CASE("3MF paint-on data validation accepts all that the writer stores", "[3mf]")
+{
+    // Random brush strokes in all states, with triangle splitting, as the paint tools make them.
+    Domain::Model model = Test::generate_cubes(1, 1);
+    ModelVolume& volume = *model.objects[0]->volumes.front();
+    const Domain::TriangleMesh& mesh = volume.mesh();
+    Algorithms::TriangleSelector selector{mesh};
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<float> unit(0.f, 1.f);
+    const int facets_count = static_cast<int>(mesh.its.indices.size());
+    for (int stroke = 0; stroke < 300; ++stroke) {
+        const int facet = std::uniform_int_distribution<int>(0, facets_count - 1)(rng);
+        const auto& indices = mesh.its.indices[facet];
+        const Domain::Vec3f& a = mesh.its.vertices[indices[0]];
+        const Domain::Vec3f& b = mesh.its.vertices[indices[1]];
+        const Domain::Vec3f& c = mesh.its.vertices[indices[2]];
+        float u = unit(rng), v = unit(rng);
+        if (u + v > 1.f) {
+            u = 1.f - u;
+            v = 1.f - v;
+        }
+        const Domain::Vec3f hit    = a + u * (b - a) + v * (c - a);
+        const Domain::Vec3f normal = (b - a).cross(c - a).normalized();
+        const auto state = static_cast<TriangleStateType>(
+            std::uniform_int_distribution<int>(1, static_cast<int>(Domain::TriangleSelector::TRIANGLE_STATE_TYPE_COUNT) - 1)(rng)
+        );
+        const float radius = 0.5f + 6.f * unit(rng);
+        selector.select_patch(
+            facet,
+            std::make_unique<Algorithms::TriangleSelector::Sphere>(
+                hit, hit + 100.f * normal, radius, Domain::Transform3d::Identity(),
+                Algorithms::TriangleSelector::ClippingPlane{}, 0.5f
+            ),
+            state, Domain::Transform3d::Identity(), true
+        );
+    }
+
+    FacetsAnnotation& facets = volume.mm_segmentation_facets;
+    facets.triangle_splitting_data = selector.serialize();
+    bool has_split = false;
+    for (int facet = 0; facet < facets_count; ++facet) {
+        const std::string str = facets.get_triangle_as_string(facet);
+        if (!str.empty()) {
+            // The decoder reads the last digit first. Its two low bits are the number of split sides.
+            const int root_code = str.back() <= '9' ? str.back() - '0' : str.back() - 'A' + 10;
+            has_split |= (root_code & 0b11) != 0;
+        }
+        INFO("facet " << facet << ": " << str);
+        CHECK(format_3MF::is_valid_triangle_paint_string(str));
+    }
+    CHECK(has_split);
+}
+
+TEST_CASE("3MF paint-on data with a triangle id out of the mesh is dropped", "[3mf]")
+{
+    // The decoder indexes the triangles of the mesh with this id: a heap write out of bounds.
+    const TempProjectFile file = cube_with_facets_annotation(
+        R"([{"id": 1, "mmSegmentationFacets": [{"triangle": 1, "dividing": "8"}, {"triangle": 100000, "dividing": "4"}], "mmSegmentationFacetsVersion": 1}])"
+    );
+    const Loaded3MF loaded = load_3mf(file.path().string());
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *loaded.model.objects[0]->volumes.front();
+    CHECK(loaded.issues_map.has_issue(Read3mfIssueType::facets_triangle_id_issue));
+    CHECK(volume.mm_segmentation_facets.get_data().triangles_to_split.size() == 1);
+    CHECK(volume.mm_segmentation_facets.get_triangle_as_string(1) == "8");
+    decode_paint(volume, volume.mm_segmentation_facets);
+}
+
+TEST_CASE("3MF paint-on data with triangle ids not in increasing order is dropped", "[3mf]")
+{
+    // FacetsAnnotation::set_triangle_from_string() requires increasing ids (a release ASSERT).
+    const TempProjectFile file = cube_with_facets_annotation(
+        R"([{"id": 1, "seamFacets": [{"triangle": 5, "dividing": "4"}, {"triangle": 2, "dividing": "4"}], "seamFacetsVersion": 1}])"
+    );
+    const Loaded3MF loaded = load_3mf(file.path().string());
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *loaded.model.objects[0]->volumes.front();
+    CHECK(loaded.issues_map.has_issue(Read3mfIssueType::facets_triangle_id_issue));
+    CHECK(volume.seam_facets.get_triangle_as_string(5) == "4");
+    CHECK(volume.seam_facets.get_triangle_as_string(2).empty());
+    decode_paint(volume, volume.seam_facets);
+}
+
+TEST_CASE("3MF paint-on data in two entries of the same volume keeps the order of the ids", "[3mf]")
+{
+    // The second entry adds to the paint-on data of the first one.
+    const TempProjectFile file = cube_with_facets_annotation(
+        R"([{"id": 1, "seamFacets": [{"triangle": 5, "dividing": "4"}], "seamFacetsVersion": 1},)"
+        R"( {"id": 1, "seamFacets": [{"triangle": 2, "dividing": "4"}], "seamFacetsVersion": 1}])"
+    );
+    const Loaded3MF loaded = load_3mf(file.path().string());
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *loaded.model.objects[0]->volumes.front();
+    CHECK(loaded.issues_map.has_issue(Read3mfIssueType::facets_triangle_id_issue));
+    CHECK(volume.seam_facets.get_triangle_as_string(5) == "4");
+    CHECK(volume.seam_facets.get_triangle_as_string(2).empty());
+    decode_paint(volume, volume.seam_facets);
+}
+
+TEST_CASE("3MF paint-on data with a truncated split is dropped", "[3mf]")
+{
+    // A split without its children: the decoder reads after the end of the data.
+    const TempProjectFile file = cube_with_facets_annotation(
+        R"([{"id": 1, "supportedFacets": [{"triangle": 0, "dividing": "1"}], "supportedFacetsVersion": 1}])"
+    );
+    const Loaded3MF loaded = load_3mf(file.path().string());
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *loaded.model.objects[0]->volumes.front();
+    CHECK(loaded.issues_map.has_issue(Read3mfIssueType::facets_dividing_data_issue));
+    CHECK(volume.supported_facets.get_data().triangles_to_split.empty());
+    decode_paint(volume, volume.supported_facets);
+}
+
+TEST_CASE("3MF paint-on data that is valid is kept", "[3mf]")
+{
+    const TempProjectFile file = cube_with_facets_annotation(
+        R"([{"id": 1, "mmSegmentationFacets": [{"triangle": 0, "dividing": "481"}, {"triangle": 3, "dividing": "00EC"}], "mmSegmentationFacetsVersion": 1}])"
+    );
+    const Loaded3MF loaded = load_3mf(file.path().string());
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *loaded.model.objects[0]->volumes.front();
+    CHECK_FALSE(loaded.issues_map.has_issue(Read3mfIssueType::facets_triangle_id_issue));
+    CHECK_FALSE(loaded.issues_map.has_issue(Read3mfIssueType::facets_dividing_data_issue));
+    CHECK(volume.mm_segmentation_facets.get_triangle_as_string(0) == "481");
+    CHECK(volume.mm_segmentation_facets.get_triangle_as_string(3) == "00EC");
+    decode_paint(volume, volume.mm_segmentation_facets);
+}
+
+TEST_CASE("3MF legacy loader drops malformed paint-on data", "[3mf]")
+{
+    // PrusaSlicer 2.x stores the paint-on data in attributes of each triangle. BambuStudio and
+    // OrcaSlicer use "paint_color" for the multi-material painting.
+    const std::string attribute = GENERATE(
+        std::string("slic3rpe:mmu_segmentation=\"1\""), // A split without its children.
+        std::string("paint_color=\"1\""),               // The same in the BambuStudio attribute.
+        std::string("slic3rpe:mmu_segmentation=\"4G\"") // Not hex: a release ASSERT.
+    );
+    INFO(attribute);
+    const TempProjectFile file = legacy_cube(attribute);
+    const Domain::Model model = load_with_legacy_importer(file.path());
+
+    REQUIRE(model.objects.size() == 1);
+    REQUIRE(model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *model.objects[0]->volumes.front();
+    CHECK(volume.mm_segmentation_facets.get_triangle_as_string(0).empty());
+    decode_paint(volume, volume.mm_segmentation_facets);
+}
+
+TEST_CASE("3MF legacy loader keeps valid paint-on data", "[3mf]")
+{
+    const TempProjectFile file = legacy_cube("slic3rpe:mmu_segmentation=\"481\"");
+    const Domain::Model model = load_with_legacy_importer(file.path());
+
+    REQUIRE(model.objects.size() == 1);
+    REQUIRE(model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *model.objects[0]->volumes.front();
+    CHECK(volume.mm_segmentation_facets.get_triangle_as_string(0) == "481");
+    decode_paint(volume, volume.mm_segmentation_facets);
 }

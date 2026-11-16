@@ -1194,6 +1194,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Format/3mf/Model3mf.cpp
         src/Slic3r/Biz/Format/3mf/Model3mf.hpp
         src/Slic3r/Biz/Format/3mf/ModelMap.hpp
+        src/Slic3r/Biz/Format/3mf/PaintingValidation.cpp
         src/Slic3r/Biz/Format/3mf/PrusaFile.cpp
         src/Slic3r/Biz/Format/3mf/PrusaFile.hpp
         src/Slic3r/Biz/Format/3mf/Relations.cpp

@@ -13,6 +13,7 @@
 #include "Slic3r/Biz/Algorithms/LayerHeight.hpp"
 #include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Format/ProjectFileConstants.hpp"
+#include "Slic3r/Biz/Format/3mf/PaintingValidation.hpp"
 #include "Slic3r/Biz/Format/VirtualExtruder.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/ProjectMetadataJson.hpp"
@@ -805,11 +806,28 @@ void load(const json &facets_json_arr, const VolumeMap &volume_map, Read3mfIssue
             unsigned triangle_index = 0;
             if (!from_json(facet_json, TRIANGLE, triangle_index, collected_issues, RT::facets_triangle_id_issue, true))
                 continue;
+            // The decoder indexes the mesh triangles by this value without a bounds check, and
+            // set_triangle_from_string() requires strictly increasing indices. Compare with the data
+            // in `facets`: more than one entry of the file can have the same volume id.
+            const auto& painted = facets.triangle_splitting_data.triangles_to_split;
+            if (triangle_index >= mesh_facets_count
+                || (!painted.empty() && triangle_index <= static_cast<unsigned>(painted.back().triangle_idx)))
+            {
+                collected_issues.add_issue(Read3mfIssue(
+                    RT::facets_triangle_id_issue, std::nullopt, std::to_string(triangle_index)
+                ));
+                continue;
+            }
             std::string data;
             if (!from_json(facet_json, DIVIDING, data, collected_issues, RT::facets_dividing_data_issue, true))
                 continue;
+            if (!format_3MF::is_valid_triangle_paint_string(data)) {
+                collected_issues.add_issue(Read3mfIssue(
+                    RT::facets_dividing_data_issue, std::nullopt, std::to_string(triangle_index)
+                ));
+                continue;
+            }
 
-            // TODO: check setting invalid data !!!
             facets.set_triangle_from_string(triangle_index, data);
         }
         facets.shrink_to_fit();

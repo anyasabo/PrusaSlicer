@@ -535,7 +535,9 @@ static void handle_legacy_project_loaded(
         // support_material = true,  support_material_auto = false  -> enforcers_only
         // support_material = true,  support_material_auto = true   -> everywhere
         // handle_legacy() already mapped the bool to none/everywhere.
-        if (opt_support_material->value != Slic3rLegacy::SupportMode::None
+        // support_material may be missing from a hand-made or damaged config.
+        if (opt_support_material != nullptr
+            && opt_support_material->value != Slic3rLegacy::SupportMode::None
             && !opt_support_material_auto->value)
         {
             opt_support_material->value = Slic3rLegacy::SupportMode::EnforcersOnly;

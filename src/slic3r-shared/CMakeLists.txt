@@ -1776,6 +1776,7 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/Biz/Format/3MFTests.cpp
             test/Slic3r/Biz/Format/STEPTests.cpp
+            test/Slic3r/Biz/Format/STLTests.cpp
 
             test/Slic3r/Biz/BundleCacheTests.cpp
 

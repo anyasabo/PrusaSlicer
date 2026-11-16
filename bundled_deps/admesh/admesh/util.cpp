@@ -275,6 +275,9 @@ static float get_area(stl_facet *facet)
 
 static float get_volume(stl_file *stl)
 {
+  	// Repair may have removed every facet (e.g. all of them degenerate or unconnected).
+  	if (stl->stats.number_of_facets == 0)
+  		return 0.f;
   	// Choose a point, any point as the reference.
   	stl_vertex p0 = stl->facet_start[0].vertex[0];
   	float volume = 0.f;

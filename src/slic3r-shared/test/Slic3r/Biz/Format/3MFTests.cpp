@@ -926,3 +926,23 @@ TEST_CASE("3MF relationship of an unknown type without Target and Id is reported
     CHECK(loaded->model.objects.size() == 1);
     CHECK(loaded->issues_map.has_issue(Read3mfIssueType::relation_unexpected_type));
 }
+
+TEST_CASE("3MF legacy loader closes the archive when its config parser throws", "[3mf]")
+{
+    // The archive stayed open: the miniz state and the file handle leaked. The project open job
+    // catches the exception, so each such file leaked.
+    const TempProjectFile file = legacy_cube("", "; printer_technology = FFF\n; thumbnails = banana\n");
+
+    // The first load also does lazy initialization that can open files.
+    CHECK_THROWS(load_with_legacy_importer(file.path()));
+#ifdef __linux__
+    const auto open_files = []() {
+        return std::distance(fs::directory_iterator("/proc/self/fd"), fs::directory_iterator());
+    };
+    const auto open_files_before = open_files();
+#endif
+    CHECK_THROWS(load_with_legacy_importer(file.path()));
+#ifdef __linux__
+    CHECK(open_files() == open_files_before);
+#endif
+}

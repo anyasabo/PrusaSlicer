@@ -1021,6 +1021,9 @@ namespace Slic3rLegacy {
             add_error("Unable to open the file");
             return false;
         }
+        // Closes the archive on each exit, also on the exceptions of the config parsers. The explicit
+        // closes below release the file earlier. A second close does nothing.
+        ScopeGuard archive_guard([&archive]() { close_zip_reader(&archive); });
 
         mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
 

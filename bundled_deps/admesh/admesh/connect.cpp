@@ -26,6 +26,8 @@
 #include <math.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <vector>
 
 #include <boost/predef/other/endian.h>
@@ -88,8 +90,17 @@ struct HashEdge {
 	{
 		// Index of a grid cell spaced by tolerance.
 		typedef Eigen::Matrix<int32_t,  3, 1, Eigen::DontAlign> Vec3i;
-		Vec3i vertex1 = ((a - stl->stats.min) / tolerance).cast<int32_t>();
-		Vec3i vertex2 = ((b - stl->stats.min) / tolerance).cast<int32_t>();
+		// A coordinate far from the others, or one that is not finite, has no cell in the int32_t
+		// range. Clamp it, because the conversion of such a float to int32_t is undefined.
+		auto cell = [](float v) -> int32_t {
+			if (! (v >= -2147483648.f))
+				return std::numeric_limits<int32_t>::min(); // Also NaN.
+			if (v >= 2147483648.f)
+				return std::numeric_limits<int32_t>::max();
+			return int32_t(v);
+		};
+		Vec3i vertex1 = ((a - stl->stats.min) / tolerance).unaryExpr(cell);
+		Vec3i vertex2 = ((b - stl->stats.min) / tolerance).unaryExpr(cell);
 		static_assert(sizeof(Vec3i) == 12, "size of Vec3i incorrect");
 
 		if (vertex1 == vertex2)

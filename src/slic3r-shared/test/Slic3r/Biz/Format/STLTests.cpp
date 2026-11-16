@@ -41,3 +41,35 @@ TEST_CASE("STL whose triangles the repair removes completely is reported as empt
     REQUIRE_FALSE(loaded.has_value());
     CHECK_THAT(loaded.error(), Catch::Matchers::ContainsSubstring("empty"));
 }
+
+TEST_CASE("STL with coordinates out of the range of the repair grid loads", "[stl]")
+{
+    // The repair puts the vertices of open edges into a grid of int32_t cells. A coordinate this
+    // far from the others has no cell in that range, and the float to int conversion was
+    // undefined behavior. Only UBSan with halt_on_error=1 sees it.
+    const ::Tests::TestTempDir temp_dir;
+    const boost::filesystem::path file_path = temp_dir.path() / "huge_coordinates.stl";
+    {
+        boost::nowide::ofstream file(file_path.string());
+        file << "solid a\n"
+                "  facet normal 0 0 1\n"
+                "    outer loop\n"
+                "      vertex 0 0 0\n"
+                "      vertex 10 0 0\n"
+                "      vertex 0 10 0\n"
+                "    endloop\n"
+                "  endfacet\n"
+                "  facet normal 0 0 1\n"
+                "    outer loop\n"
+                "      vertex 3e38 0 0\n"
+                "      vertex 0 3e38 0\n"
+                "      vertex 0 0 3e38\n"
+                "    endloop\n"
+                "  endfacet\n"
+                "endsolid a\n";
+    }
+
+    const auto loaded = Biz::load_stl(file_path.string());
+
+    CHECK((loaded.has_value() || !loaded.error().empty()));
+}

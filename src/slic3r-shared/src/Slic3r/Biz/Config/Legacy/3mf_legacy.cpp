@@ -1770,7 +1770,11 @@ namespace Slic3rLegacy {
                 std::vector<SupportPoint> sla_support_points;
 
                 if (version == 0) {
-                    assert(object_data_points.size() % 3 == 0);
+                    // The loop reads complete groups of values. The file comes from outside.
+                    if (object_data_points.size() % 3 != 0) {
+                        add_error("Error while reading SLA support points");
+                        continue;
+                    }
                     for (unsigned int i=0; i<object_data_points.size(); i+=3)
                         sla_support_points.push_back(SupportPoint{Vec3f(
                                                     float(std::atof(object_data_points[i+0].c_str())),
@@ -1785,7 +1789,10 @@ namespace Slic3rLegacy {
                                //(std::abs(val - 3.) < EPSILON) ? SupportPointType::slope :
                                 SupportPointType::slope; // default for previous version of store points
                     };
-                    assert(object_data_points.size() % 5 == 0);
+                    if (object_data_points.size() % 5 != 0) {
+                        add_error("Error while reading SLA support points");
+                        continue;
+                    }
                     for (unsigned int i=0; i<object_data_points.size(); i+=5)
                         sla_support_points.push_back(
                             SupportPoint{
@@ -1862,6 +1869,11 @@ namespace Slic3rLegacy {
                 Domain::SLA::DrainHoles sla_drain_holes;
 
                 if (version == 1) {
+                    // The loop reads complete groups of values. The file comes from outside.
+                    if (object_data_points.size() % 8 != 0) {
+                        add_error("Error while reading SLA drain holes");
+                        continue;
+                    }
                     for (unsigned int i=0; i<object_data_points.size(); i+=8)
                         sla_drain_holes.emplace_back(Domain::SLA::DrainHole{
                             .pos =

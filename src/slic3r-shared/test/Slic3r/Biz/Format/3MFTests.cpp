@@ -676,9 +676,13 @@ TempProjectFile cube_with_facets_annotation(const std::string& facets_json)
     });
 }
 
-// A legacy (2.x) cube 3mf with `first_triangle_attributes` on its first triangle and with
-// `config` as Metadata/Slic3r_PE.config (no config if empty).
-TempProjectFile legacy_cube(const std::string& first_triangle_attributes, const std::string& config = {})
+// A legacy (2.x) cube 3mf with `first_triangle_attributes` on its first triangle, with `config`
+// as Metadata/Slic3r_PE.config (no config if empty) and with the archive entries of `extra_entries`.
+TempProjectFile legacy_cube(
+    const std::string& first_triangle_attributes,
+    const std::string& config = {},
+    const std::vector<std::pair<std::string, std::string>>& extra_entries = {}
+)
 {
     std::vector<std::pair<std::string, std::string>> entries{
         {"_rels/.rels", relationships_xml()},
@@ -686,6 +690,7 @@ TempProjectFile legacy_cube(const std::string& first_triangle_attributes, const 
     };
     if (!config.empty())
         entries.emplace_back("Metadata/Slic3r_PE.config", config);
+    entries.insert(entries.end(), extra_entries.begin(), extra_entries.end());
     return TempProjectFile(entries);
 }
 
@@ -911,6 +916,46 @@ TEST_CASE("3MF legacy config with support_material_auto but no support_material 
     const Domain::Model model = load_with_legacy_importer(file.path());
 
     CHECK(model.objects.size() == 1);
+}
+
+TEST_CASE("3MF legacy SLA points with an incomplete group of values are dropped", "[3mf]")
+{
+    // Each support point has 3 (version 0) or 5 (version 1) values, and each drain hole has 8.
+    // The loader read the values of the last group after the end of the vector.
+    const auto [entry_name, content] = GENERATE(
+        std::make_pair(std::string("Metadata/Slic3r_PE_sla_support_points.txt"),
+                       std::string("object_id=1|5 5 10 5\n")),
+        std::make_pair(std::string("Metadata/Slic3r_PE_sla_support_points.txt"),
+                       std::string("support_points_format_version=1\nobject_id=1|5 5 10 0.4 1 5\n")),
+        std::make_pair(std::string("Metadata/Slic3r_PE_sla_drain_holes.txt"),
+                       std::string("drain_holes_format_version=1\nobject_id=1|5 5 10 0 0 1 1\n"))
+    );
+    INFO(entry_name << ": " << content);
+    const TempProjectFile file = legacy_cube("", "", {{entry_name, content}});
+    const Domain::Model model = load_with_legacy_importer(file.path());
+
+    REQUIRE(model.objects.size() == 1);
+    REQUIRE(model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *model.objects[0]->volumes.front();
+    CHECK(volume.sla_support_points.empty());
+    CHECK(volume.sla_drain_holes.empty());
+}
+
+TEST_CASE("3MF legacy SLA points with complete groups of values are kept", "[3mf]")
+{
+    const TempProjectFile file = legacy_cube(
+        "",
+        "",
+        {{"Metadata/Slic3r_PE_sla_support_points.txt", "support_points_format_version=1\nobject_id=1|5 5 10 0.4 1\n"},
+         {"Metadata/Slic3r_PE_sla_drain_holes.txt", "drain_holes_format_version=1\nobject_id=1|5 5 10 0 0 1 1 2\n"}}
+    );
+    const Domain::Model model = load_with_legacy_importer(file.path());
+
+    REQUIRE(model.objects.size() == 1);
+    REQUIRE(model.objects[0]->volumes.size() == 1);
+    const ModelVolume& volume = *model.objects[0]->volumes.front();
+    CHECK(volume.sla_support_points.size() == 1);
+    CHECK(volume.sla_drain_holes.size() == 1);
 }
 
 TEST_CASE("3MF relationship of an unknown type without Target and Id is reported", "[3mf]")

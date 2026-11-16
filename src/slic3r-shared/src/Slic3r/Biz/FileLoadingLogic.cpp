@@ -773,6 +773,18 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
                     fmt::make_format_args(ret.file_name, e.issue.msg)
                 )
             ));
+        } catch (const std::exception& e) {
+            // The legacy loader also throws other exceptions on malformed files (config parsing,
+            // boost::property_tree). The callers of this function do not catch them: on the import
+            // path (File > Import, the Printables "Load" button), the application terminated.
+            const std::string message = e.what();
+            return tl::make_unexpected(FileLoadError::error(
+                fmt::vformat(
+                    // TRN 1st {} is the name of the 3MF file, 2nd {} is the error message
+                    _u8L("Failed to load model from 3MF file {}. {}"),
+                    fmt::make_format_args(ret.file_name, message)
+                )
+            ));
         }
     } else if (is_step) {
         Platform::PlatformServices& platform_services = Platform::PlatformServices::instance();
